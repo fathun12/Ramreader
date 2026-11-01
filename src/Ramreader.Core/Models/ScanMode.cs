@@ -7,5 +7,6 @@ public enum ScanMode
     Changed,
     Unchanged,
     Increased,
-    Decreased
+    Decreased,
+    Between
 }

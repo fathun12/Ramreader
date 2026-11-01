@@ -66,6 +66,36 @@ public static class ValueCodec
         _ => BitConverter.UInt64BitsToDouble(a).CompareTo(BitConverter.UInt64BitsToDouble(b))
     };
 
+    /// <summary>True kalau nilai berada di antara min dan max (inklusif). NaN tidak pernah masuk rentang.</summary>
+    public static bool InRange(ScanValueType type, ulong raw, ulong min, ulong max)
+    {
+        switch (type)
+        {
+            case ScanValueType.Int32:
+            {
+                int v = (int)(uint)raw;
+                return v >= (int)(uint)min && v <= (int)(uint)max;
+            }
+            case ScanValueType.Float:
+            {
+                float v = BitConverter.UInt32BitsToSingle((uint)raw);
+                return v >= BitConverter.UInt32BitsToSingle((uint)min)
+                    && v <= BitConverter.UInt32BitsToSingle((uint)max);
+            }
+            case ScanValueType.Int64:
+            {
+                long v = (long)raw;
+                return v >= (long)min && v <= (long)max;
+            }
+            default:
+            {
+                double v = BitConverter.UInt64BitsToDouble(raw);
+                return v >= BitConverter.UInt64BitsToDouble(min)
+                    && v <= BitConverter.UInt64BitsToDouble(max);
+            }
+        }
+    }
+
     public static ulong ReadRaw(byte[] data, int offset, int size) =>
         size == 4 ? BitConverter.ToUInt32(data, offset) : BitConverter.ToUInt64(data, offset);
 }

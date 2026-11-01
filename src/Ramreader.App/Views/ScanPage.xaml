@@ -44,7 +44,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1.2*" />
                             <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1.8*" />
                             <ColumnDefinition Width="16" />
                             <ColumnDefinition Width="1.2*" />
                         </Grid.ColumnDefinitions>
@@ -57,11 +57,25 @@
                                       IsEnabled="{Binding CanChangeType}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Nilai" Style="{StaticResource FieldLabel}" />
-                            <ui:TextBox PlaceholderText="Contoh: 100"
-                                        Text="{Binding ValueInput, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
+                        <Grid Grid.Column="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Nilai" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox PlaceholderText="Contoh: 100"
+                                            Text="{Binding ValueInput, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Sampai (rentang)" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox PlaceholderText="Batas atas"
+                                            Text="{Binding ValueMaxInput, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
 
                         <StackPanel Grid.Column="4">
                             <TextBlock Text="Mode scan lanjutan" Style="{StaticResource FieldLabel}" />
@@ -82,6 +96,14 @@
                             <ui:Button Content="Scan Pertama"
                                        Appearance="Primary"
                                        Command="{Binding FirstScanCommand}" />
+                            <ui:Button Content="Ambil Snapshot"
+                                       Margin="8,0,0,0"
+                                       ToolTip="Untuk nilai yang tidak tampil sebagai angka (misalnya bar HP). Tidak perlu mengetik nilai."
+                                       Command="{Binding SnapshotCommand}" />
+                            <ui:Button Content="Scan Rentang"
+                                       Margin="8,0,0,0"
+                                       ToolTip="Cari nilai di antara batas bawah (kolom Nilai) dan batas atas (kolom Sampai)."
+                                       Command="{Binding RangeScanCommand}" />
                             <ui:Button Content="Scan Lanjutan"
                                        Margin="8,0,0,0"
                                        Command="{Binding NextScanCommand}" />

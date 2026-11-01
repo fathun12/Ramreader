@@ -19,7 +19,9 @@ public partial class ScanViewModel : ObservableObject
     private const int MaxRows = 300;
 
     private const string StartHint =
-        "Langkah 1: ketik nilai yang kamu lihat di game (misalnya HP 100), lalu klik Scan Pertama.";
+        "Langkah 1: ketik nilai yang kamu lihat di game (misalnya HP 100), lalu klik Scan Pertama. " +
+        "Kalau nilainya tidak tampil sebagai angka (misalnya bar HP), pilih tipe nilai lalu klik Ambil Snapshot. " +
+        "Kalau kamu hanya tahu perkiraannya (misalnya sekitar 60-70%), isi Nilai dan Sampai lalu klik Scan Rentang.";
 
     private readonly ValueScanner _scanner = new();
     private readonly DispatcherTimer _refreshTimer;
@@ -41,7 +43,8 @@ public partial class ScanViewModel : ObservableObject
         new ModeOption(ScanMode.Changed, "Nilai berubah"),
         new ModeOption(ScanMode.Unchanged, "Nilai tidak berubah"),
         new ModeOption(ScanMode.Increased, "Nilai bertambah"),
-        new ModeOption(ScanMode.Decreased, "Nilai berkurang")
+        new ModeOption(ScanMode.Decreased, "Nilai berkurang"),
+        new ModeOption(ScanMode.Between, "Nilai dalam rentang (kolom Nilai sampai Sampai)")
     };
 
     public ObservableCollection<ScanRow> Rows { get; } = new();
@@ -54,6 +57,10 @@ public partial class ScanViewModel : ObservableObject
 
     [ObservableProperty]
     private string _valueInput = "";
+
+    /// <summary>Batas atas untuk scan rentang (batas bawahnya ada di ValueInput).</summary>
+    [ObservableProperty]
+    private string _valueMaxInput = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMessage))]
@@ -142,6 +149,43 @@ public partial class ScanViewModel : ObservableObject
             (progress, ct) => _scanner.FirstScan(memory, type, target, progress, ct));
     }
 
+    [RelayCommand(CanExecute = nameof(CanFirstScan))]
+    private async Task RangeScanAsync()
+    {
+        var memory = Session.Memory;
+        if (memory is null) return;
+
+        var type = SelectedType.Type;
+        if (!TryParseRange(type, out var min, out var max)) return;
+
+        await RunScanAsync(memory, "Memindai memori game (rentang nilai)...",
+            (progress, ct) => _scanner.FirstScanRange(memory, type, min, max, progress, ct));
+    }
+
+    private bool TryParseRange(ScanValueType type, out ulong min, out ulong max)
+    {
+        max = 0;
+        if (!ValueCodec.TryParse(type, ValueInput, out min) ||
+            !ValueCodec.TryParse(type, ValueMaxInput, out max))
+        {
+            Message = "Rentang tidak valid. Isi kolom Nilai (batas bawah) dan Sampai (batas atas) dengan angka, misalnya 0.65 sampai 0.75.";
+            return false;
+        }
+        return true;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanFirstScan))]
+    private async Task SnapshotAsync()
+    {
+        var memory = Session.Memory;
+        if (memory is null) return;
+
+        var type = SelectedType.Type;
+
+        await RunScanAsync(memory, "Mengambil snapshot memori game...",
+            (progress, ct) => _scanner.FirstScanUnknown(memory, type, progress, ct));
+    }
+
     [RelayCommand(CanExecute = nameof(CanNextScan))]
     private async Task NextScanAsync()
     {
@@ -150,14 +194,18 @@ public partial class ScanViewModel : ObservableObject
 
         var mode = SelectedMode.Mode;
         ulong target = 0;
+        ulong upper = 0;
         if (mode == ScanMode.Exact && !ValueCodec.TryParse(_scanner.ValueType, ValueInput, out target))
         {
             Message = "Nilai tidak valid. Ketik nilai barunya di kolom Nilai, atau pilih mode lain (berubah / bertambah / berkurang).";
             return;
         }
 
+        if (mode == ScanMode.Between && !TryParseRange(_scanner.ValueType, out target, out upper))
+            return;
+
         await RunScanAsync(memory, "Menyaring kandidat...",
-            (progress, ct) => _scanner.NextScan(memory, mode, target, progress, ct));
+            (progress, ct) => _scanner.NextScan(memory, mode, target, progress, ct, upper));
     }
 
     [RelayCommand(CanExecute = nameof(CanReset))]
@@ -255,15 +303,19 @@ public partial class ScanViewModel : ObservableObject
         int count = _scanner.Count;
 
         ResultSummary = !_scanner.HasScan ? ""
+            : _scanner.IsSnapshot ? $"{count:N0} alamat kandidat (terlalu banyak untuk ditampilkan, saring dulu dengan Scan Lanjutan)"
             : count > MaxRows ? $"{count:N0} alamat ditemukan (menampilkan {MaxRows} pertama)"
             : $"{count:N0} alamat ditemukan";
 
         Hint = !_scanner.HasScan ? StartHint
+            : _scanner.IsSnapshot ? "Snapshot siap. Ubah nilainya di game (misalnya kena damage), pilih mode Nilai berkurang atau bertambah, lalu klik Scan Lanjutan. Kalau nilainya sengaja kamu biarkan, pilih Nilai tidak berubah. Ulangi sampai alamatnya tinggal sedikit."
             : count == 0 ? "Tidak ada yang cocok. Klik Reset dan mulai lagi dengan nilai yang tepat."
             : count <= 10 ? "Sudah sedikit. Pilih alamat yang nilainya ikut berubah di game, lalu klik Jadikan Target."
             : "Langkah 2: ubah nilainya di game (misalnya kena damage), ketik nilai barunya, lalu klik Scan Lanjutan. Ulangi sampai alamatnya tinggal sedikit.";
 
-        if (_scanner.Truncated)
+        if (_scanner.SnapshotTruncated)
+            Message = $"Snapshot hanya memuat sebagian memori game (batas {ValueScanner.MaxSnapshotBytes / 1_073_741_824} GB), jadi alamat targetmu mungkin tidak ikut. Kalau targetnya tidak ketemu, coba Scan Pertama dengan nilai tepat.";
+        else if (_scanner.Truncated)
             Message = $"Kandidat melewati batas {ValueScanner.MaxHits:N0} dan hasilnya dipotong, jadi alamat targetmu mungkin tidak ikut. Klik Reset lalu coba nilai yang lebih spesifik.";
 
         OnPropertyChanged(nameof(CanChangeType));
@@ -299,6 +351,8 @@ public partial class ScanViewModel : ObservableObject
     private void UpdateStates()
     {
         FirstScanCommand.NotifyCanExecuteChanged();
+        SnapshotCommand.NotifyCanExecuteChanged();
+        RangeScanCommand.NotifyCanExecuteChanged();
         NextScanCommand.NotifyCanExecuteChanged();
         ResetCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();

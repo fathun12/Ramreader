@@ -1,7 +1,7 @@
 # SPEC: Ramreader
 
 > Dokumen serah-terima untuk sesi AI berikutnya. Baca SELURUHNYA sebelum menulis apa pun.
-> Terakhir diperbarui: 1 Nov 2026. Status: Langkah 1-6 dan 8 (Simpan Alamat + kartu Tersimpan) terbukti jalan di NSUNSC, termasuk tema terpusat (Themes\AppStyles.xaml). Yang belum dites: Ekspor Profil. Langkah berikutnya belum diputuskan (kandidat: 5b, 7, atau trainer). Lihat bagian 9.
+> Terakhir diperbarui: 1 Nov 2026. Status: Langkah 1-6 dan 8 (Simpan Alamat + kartu Tersimpan) terbukti jalan di NSUNSC, termasuk tema terpusat (Themes\AppStyles.xaml). Ekspor Profil terbukti (JSON NSUNSC.profile.json valid). Langkah 5b dibangun (snapshot terbukti; Scan Rentang belum dites). Urutan berikutnya: 7 (signature), backlog lain, trainer paling akhir. Lihat bagian 9.
 
 ## 0. Prompt pembuka untuk sesi baru
 
@@ -210,7 +210,7 @@ Tujuan: cari rantai `Game.exe+offset -> [+o1] -> [+o2] ...` menuju alamat target
 | 4 | Halaman Pilih Game + GameSession + bilah status | Selesai (`ui:ListView` sudah diperbaiki; hubungkan lewat tombol atau klik dua kali bekerja) |
 | 5 | Halaman Cari Nilai | Selesai (terbukti: scan int jumlah tiket NSUNSC, Scan Lanjutan, Jadikan Target). Kegagalan awal terjadi karena Ramreader tersambung ke msedge, bukan ke game |
 | 6 | Pointer scan + verify (halaman Jalur Stabil) | Selesai (terbukti: 16 jalur diperiksa, 15 bertahan setelah restart game; jalur langsung NSUNSC.exe+21DA00C ikut bertahan). Kode di 11.2, desain di 7.2 |
-| 5b | Scan nilai awal tidak diketahui + scan rentang nilai (between) | Diusulkan setelah Langkah 6 |
+| 5b | Scan nilai awal tidak diketahui + scan rentang nilai (between) | Snapshot terbukti (HP NSUNSC float ketemu, 11 jalur, terverifikasi 1x). Scan Rentang: kode terpasang, belum dites. Lihat 11.5 |
 | 7 | AOB + signature | Belum |
 | 8 | Tersimpan, sesi JSON, ekspor | Terbukti: Simpan Alamat, kartu Tersimpan membaca nilai tiket NSUNSC secara langsung (ikut berubah di game). Belum dites: Ekspor Profil (klik, lalu cek isi file JSON) |
 | 8b | Tata letak baru + tema terpusat | Selesai (lihat 11.4). Judul halaman putih terbukti di Proses dan Signature; semua halaman memakai Themes\AppStyles.xaml |
@@ -266,12 +266,18 @@ App:
 - Judul sempat tampil hitam karena pembungkus gulir bawaan WPF-UI tidak lagi ikut memberi warna ke teks; gaya `AppPage` sekarang mengisi `Foreground` eksplisit. Belum dikonfirmasi di layar.
 - Hal yang masih tertulis per halaman (belum dipusatkan): jarak antar tombol (`Margin="8,0,0,0"`), lebar kolom daftar.
 
+### 11.5 Snapshot dan scan rentang (Langkah 5b)
+- `ValueScanner.FirstScanUnknown` (tombol Ambil Snapshot) dan `FirstScanRange` (tombol Scan Rentang) memakai `CaptureSnapshot`: blok memori + bitmask kandidat (`BitArray`), batas `MaxSnapshotBytes` = 3 GB (flag `SnapshotTruncated`). Selama kandidat > `MaxHits` (5 juta) disimpan padat (`IsSnapshot`, daftar `Hits` kosong); begitu <= 5 juta otomatis jadi daftar alamat biasa.
+- `ScanMode.Between` + `ValueCodec.InRange` (inklusif, NaN tidak masuk, batas ditukar otomatis kalau terbalik). `NextScan` menerima parameter opsional `upper`.
+- Pembatalan di tengah scan lanjutan mode snapshot membuang snapshot (blok lama dilepas bertahap supaya RAM tidak dobel); ambil snapshot lagi.
+- UI: kolom `Sampai (rentang)` di sebelah kolom Nilai; mode lanjutan "Nilai dalam rentang".
+
 ## 12. Catatan lapangan dan backlog
 
 - Game uji bebas (user bukan hanya satu game). Untuk uji pipeline tanpa risiko: Cheat Engine Tutorial (Tutorial-x86_64.exe) atau game single-player apa pun. Coba nilai bilangan bulat dulu (uang, amunisi) sebelum float.
 - Scan float HP gagal pada percobaan pertama. Penyebab umum: game menyimpan sebagai int/double atau dengan skala lain (0-1, persen); nilai di layar dibulatkan sehingga bukan nilai mentah; nilai mentah tidak persis sama dengan yang tampil. Scan "tepat sama" tidak bisa menolong di kasus ini.
 - Backlog berurutan prioritas:
-  1. Langkah 5b: scan nilai awal tidak diketahui (snapshot) + scan rentang nilai (between).
+  1. Langkah 5b (SELESAI, lihat 11.5): snapshot + scan rentang.
   2. Pointer scan dengan banyak target sekaligus (user belum tahu mana alamat yang benar dari beberapa kandidat).
   3. Opsi menambah DLL lain sebagai "modul statis" di pointer scan.
   4. Debugger sederhana (hardware breakpoint) untuk "find out what writes to this address" agar alamat instruksi tidak perlu dari Cheat Engine.
