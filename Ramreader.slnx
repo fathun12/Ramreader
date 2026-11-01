@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ramreader.App/Ramreader.App.csproj" />
+    <Project Path="src/Ramreader.Core/Ramreader.Core.csproj" />
+  </Folder>
+</Solution>

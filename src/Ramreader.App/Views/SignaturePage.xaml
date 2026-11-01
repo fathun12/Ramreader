@@ -1,0 +1,15 @@
+﻿<Page x:Class="Ramreader.App.Views.SignaturePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Signature"
+      Style="{StaticResource AppPage}">
+    <Grid Style="{StaticResource PageRoot}">
+        <StackPanel>
+            <ui:TextBlock Text="Signature" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="Buat dan uji pola byte (AOB) dari kode game."
+                       Margin="0,6,0,0"
+                       Style="{StaticResource MutedText}" />
+        </StackPanel>
+    </Grid>
+</Page>

@@ -1,0 +1,110 @@
+﻿<Page x:Class="Ramreader.App.Views.SavedPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Alamat Tersimpan"
+      Style="{StaticResource AppPage}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Page.Resources>
+
+    <Grid Style="{StaticResource PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Bagian atas: tetap di tempat -->
+        <StackPanel Grid.Row="0">
+            <StackPanel Margin="0,0,0,16">
+                <ui:TextBlock Text="Alamat Tersimpan" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Daftar alamat stabil per game, siap diekspor untuk trainer."
+                           Margin="0,6,0,0"
+                           Style="{StaticResource MutedText}" />
+            </StackPanel>
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Informational"
+                        Title="Info"
+                        Message="{Binding Message}"
+                        IsOpen="{Binding HasMessage, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <!-- Kartu: ringkasan + semua tombol -->
+            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding GameText}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding CountText}"
+                                   Margin="0,4,0,0"
+                                   Style="{StaticResource MutedText}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <ui:Button Content="Salin Jalur"
+                                   Command="{Binding CopyChainCommand}" />
+                        <ui:Button Content="Hapus"
+                                   Margin="8,0,0,0"
+                                   Command="{Binding DeleteCommand}" />
+                        <ui:Button Content="Ekspor Profil"
+                                   Margin="8,0,0,0"
+                                   Appearance="Primary"
+                                   Command="{Binding ExportCommand}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TextBlock Margin="4,0,0,12"
+                       Style="{StaticResource MutedText}"
+                       Text="Belum ada alamat. Di menu Jalur Stabil, klik Simpan Alamat setelah jalurnya terverifikasi. Hubungkan ke game dulu supaya daftar game ini muncul."
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <!-- Hanya daftar kartu yang digulir -->
+        <ui:ListView Grid.Row="1"
+                     ItemsSource="{Binding Items}"
+                     SelectedItem="{Binding SelectedItem}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ui:ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="4,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Label}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding ChainText}"
+                                       Margin="0,4,0,0"
+                                       FontFamily="Consolas"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding DetailText}"
+                                       Margin="0,4,0,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding StatusText}"
+                                       Margin="0,2,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1"
+                                   Margin="16,0,8,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding ValueText}" />
+                    </Grid>
+                </DataTemplate>
+            </ui:ListView.ItemTemplate>
+        </ui:ListView>
+    </Grid>
+</Page>

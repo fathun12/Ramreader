@@ -1,0 +1,119 @@
+﻿<Page x:Class="Ramreader.App.Views.ProcessPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Pilih Game"
+      Style="{StaticResource AppPage}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Page.Resources>
+
+    <Grid Style="{StaticResource PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Bagian atas: tetap di tempat -->
+        <StackPanel Grid.Row="0">
+            <StackPanel Margin="0,0,0,16">
+                <ui:TextBlock Text="Pilih Game" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Pilih proses game yang sedang berjalan, lalu hubungkan."
+                           Margin="0,6,0,0"
+                           Style="{StaticResource MutedText}" />
+            </StackPanel>
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Error"
+                        Title="Gagal terhubung"
+                        Message="{Binding ErrorMessage}"
+                        IsOpen="{Binding HasError, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <!-- Kartu: game yang sedang terhubung -->
+            <Border Style="{StaticResource CardBorder}"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding Session.IsConnected, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <ui:TextBlock Text="{Binding Session.Memory.ProcessName}" FontTypography="Subtitle" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                            <Run Text="PID " /><Run Text="{Binding Session.Memory.ProcessId, Mode=OneWay}" />
+                            <Run Text="   •   Base 0x" /><Run Text="{Binding Session.Memory.MainModule.BaseAddress, Mode=OneWay, StringFormat={}{0:X}}" />
+                            <Run Text="   •   " /><Run Text="{Binding Session.Memory.Modules.Count, Mode=OneWay}" /><Run Text=" modul" />
+                        </TextBlock>
+                    </StackPanel>
+
+                    <ui:Button Grid.Column="1"
+                               Content="Putuskan"
+                               Command="{Binding DisconnectCommand}"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Pencarian + Segarkan + Hubungkan -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ui:TextBox Grid.Column="0"
+                            PlaceholderText="Cari nama proses atau judul jendela..."
+                            Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+
+                <ui:Button Grid.Column="1"
+                           Margin="8,0,0,0"
+                           Content="Segarkan"
+                           Command="{Binding RefreshCommand}">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="ArrowSync24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+
+                <ui:Button Grid.Column="2"
+                           Margin="8,0,0,0"
+                           Appearance="Primary"
+                           Content="Hubungkan"
+                           Command="{Binding ConnectCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- Hanya daftar ini yang bisa digulir -->
+        <ui:ListView Grid.Row="1"
+                     ItemsSource="{Binding Processes}"
+                     SelectedItem="{Binding SelectedProcess}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     MouseDoubleClick="OnItemDoubleClick">
+            <ui:ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="4,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding WindowTitle}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding Id, StringFormat=PID {0}}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    </Grid>
+                </DataTemplate>
+            </ui:ListView.ItemTemplate>
+        </ui:ListView>
+    </Grid>
+</Page>
