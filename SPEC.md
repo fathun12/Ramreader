@@ -86,6 +86,9 @@ Kondisi sekarang:
 D:\Projects\Ramreader\
   Ramreader.sln
   .gitignore
+  README.md
+  LICENSE
+  Directory.Build.props         nama produk, penulis, versi untuk semua proyek
   SPEC.md
   src\
     Ramreader.Core\                 (classlib, net10.0)
