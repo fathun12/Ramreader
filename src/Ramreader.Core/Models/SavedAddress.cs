@@ -19,4 +19,7 @@ public sealed class SavedAddress
 
     /// <summary>Signature cadangan kalau semua jalur putus (mis. setelah game di-update).</summary>
     public List<SignatureRef> Signatures { get; set; } = new();
+
+    /// <summary>Code patch (mis. God Mode) yang terkait alamat ini. Ikut di profil ekspor untuk Trainer.</summary>
+    public List<CodePatch> CodePatches { get; set; } = new();
 }

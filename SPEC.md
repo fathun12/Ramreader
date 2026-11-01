@@ -1,7 +1,7 @@
 # SPEC: Ramreader
 
 > Dokumen serah-terima untuk sesi AI berikutnya. Baca SELURUHNYA sebelum menulis apa pun.
-> Terakhir diperbarui: 1 Nov 2026. Status: Langkah 1-6 dan 8 (Simpan Alamat + kartu Tersimpan) terbukti jalan di NSUNSC, termasuk tema terpusat (Themes\AppStyles.xaml). Ekspor Profil terbukti (JSON NSUNSC.profile.json valid). Langkah 5b dibangun (snapshot terbukti; Scan Rentang belum dites). Urutan berikutnya: 7 (signature), backlog lain, trainer paling akhir. Lihat bagian 9.
+> Terakhir diperbarui: 1 Nov 2026. Status: Langkah 1-8 terbukti jalan di NSUNSC (pembaca, pointer, signature, simpan, ekspor, tema terpusat). Langkah 9 (trainer): Paket A dan B terbukti (baca, set, kunci). Paket C (pengaturan per fitur, hotkey global, kecepatan kunci): kode terpasang, hotkey belum dites. Paket D (god mode lewat code patch) TERBUKTI di NSUNSC: debugger Penulis Kode di Ramreader menangkap instruksi penulis HP, patch movss 5 byte (F3 0F 11 41 10 di NSUNSC.exe+94BAE2) di-NOP lewat Trainer, HP tidak turun lagi. Belum dites: musuh ikut kebal (kalau ya, lanjut code cave khusus pemain, 9De), patch setelah restart game, pengembalian byte saat Trainer ditutup. Lihat bagian 9 dan 11.10.
 
 ## 0. Prompt pembuka untuk sesi baru
 
@@ -47,10 +47,10 @@ User berbahasa Indonesia, santai. Kalau ia menulis huruf kapital semua, itu tand
 1. **Desain dulu, bangun kalau diminta.** Jangan membuat/membangun apa pun saat user baru minta desain atau diskusi. Kalau ragu apakah sudah disuruh membangun, tanya.
 2. **Kerja di root yang sudah ada:** `D:\Projects\Ramreader`. Jangan membuat folder proyek baru di luar itu. Scaffold "di tempat" (mis. `dotnet new ... -o src\X`).
 3. **Pakai terminal untuk memulai/menambah proyek** (dotnet new, dotnet add package, dst).
-4. **Banyak folder/file sekaligus:** beri satu perintah **PowerShell 5.1** untuk terminal VS Code di root proyek (hindari `&&`; pakai baris terpisah atau `;`). Jangan menyuruh user membuat satu per satu secara manual.
-5. **Kode ditulis di chat. JANGAN membuat file** (tidak ada tool pembuatan file; user yang menyalin).
+4. **Folder dan file baru dibuat lewat terminal, bukan disalin manual.** Beri satu perintah **PowerShell 5.1** untuk terminal VS Code di root proyek (hindari `&&`; pakai baris terpisah atau `;`) yang membuat folder dan menulis SETIAP file baru memakai here-string dan `[IO.File]::WriteAllText(path, isi, (New-Object Text.UTF8Encoding $false))` (UTF-8 tanpa BOM, supaya karakter seperti bullet tidak rusak). Jangan menempel isi file baru sebagai blok kode untuk disalin satu per satu. Blok Sebelum/Sesudah hanya untuk mengubah file yang sudah ada.
+5. **Kode di chat hanya berupa Sebelum/Sesudah untuk file yang sudah ada.** Isi file baru TIDAK ditempel untuk disalin; isinya masuk ke perintah terminal pada aturan 4 (AI tidak punya akses ke disk user, jadi perintah itulah yang membuat file).
 6. **Format perubahan kode:**
-   - File baru/utuh: tulis seluruh isi, dengan path lengkap di judul.
+   - File baru/utuh: dibuat lewat perintah terminal (aturan 4); isinya ada di dalam perintah itu, path lengkap tertulis di sana.
    - Mengubah/menambah kode yang sudah ada: format **Sebelum / Sesudah** (blok "Sebelum" harus persis ada di file user).
 7. **Beri label langkah bersambung** (4a, 4b, 4c...) supaya user bisa bilang "4c sudah, 4d gagal".
 8. **Satu langkah besar per giliran**, diakhiri instruksi build/tes dan apa yang harus user laporkan. User akan menempel output terminal atau screenshot.
@@ -61,6 +61,8 @@ User berbahasa Indonesia, santai. Kalau ia menulis huruf kapital semua, itu tand
 13. Aturan Sebelum/Sesudah berlaku juga untuk SPEC.md dan file non-kode. Jangan pernah menulis "ganti bagian ini dengan ini" atau "tambahkan di akhir" tanpa teks Sebelum yang persis ada di file. Edit kecil saja; jangan menyuruh user memindah blok besar, lebih baik ganti penomoran.
 
 14. **Meminta file atau menyuruh menjalankan perintah:** jelaskan dulu masalahnya dan alasannya, lalu beri satu perintah PowerShell yang menyalin isi file ke clipboard (`Set-Clipboard`). Jangan membuat file di Desktop atau di mana pun, dan kumpulkan semua yang dibutuhkan dalam satu pesan. Jangan memakai istilah samar ("memblokir", "kutahan").
+
+15. **Jangan menunda perapian SPEC.md.** Setiap kali sesuatu terbukti atau berubah, semua tempat yang menyebutnya (header "Terakhir diperbarui", tabel bagian 9, rincian bagian 11, catatan lain) diperbarui dalam respons yang sama. Jangan menulis "dirapikan belakangan": AI sesi berikutnya hanya membaca SPEC dan akan menganggap yang sudah selesai sebagai belum. Jangan mencatat "terbukti" sebelum user melaporkan hasil dari layarnya sendiri.
 
 ## 3. Lingkungan user
 
@@ -112,6 +114,7 @@ D:\Projects\Ramreader\
         PointerChain.cs             record + Serialize / TryParse / Describe
         PointerScanner.cs           BFS multi-level + filter bloom per halaman 4 KB
         PointerVerifier.cs          Resolve(chain) + Filter(chains, target)
+        AddressResolver.cs          jalur berurutan, lalu signature (dipakai Ramreader dan Trainer)
     Ramreader.App\                  (WPF, net10.0-windows)
       App.xaml / App.xaml.cs        tema Dark; DI container (App.Services); memuat Themes\AppStyles.xaml
       Themes\
@@ -130,6 +133,11 @@ D:\Projects\Ramreader\
         GameSession.cs              Memory, IsConnected, StatusMessage, TargetAddress
         ChainStore.cs               %AppData%\Ramreader\chains\<namaproses>.txt
         SavedStore.cs               %AppData%\Ramreader\sessions\<namaproses>.json + tulis file ekspor
+    Ramreader.Trainer\              (WPF, net10.0-windows; satu trainer generik untuk semua game, lihat 11.7 dan 11.8)
+      Themes\AppStyles.xaml         salinan dari Ramreader.App
+      Services\                     TrainerSession.cs, ProfileStore.cs, MemoryWriter.cs, SettingsStore.cs, HotkeyService.cs
+      ViewModels\                   MainViewModel.cs, FeatureItem.cs
+      MainWindow.xaml / .cs
 ```
 
 Rencana tambahan (penamaan usulan):
@@ -214,10 +222,13 @@ Tujuan: cari rantai `Game.exe+offset -> [+o1] -> [+o2] ...` menuju alamat target
 | 5 | Halaman Cari Nilai | Selesai (terbukti: scan int jumlah tiket NSUNSC, Scan Lanjutan, Jadikan Target). Kegagalan awal terjadi karena Ramreader tersambung ke msedge, bukan ke game |
 | 6 | Pointer scan + verify (halaman Jalur Stabil) | Selesai (terbukti: 16 jalur diperiksa, 15 bertahan setelah restart game; jalur langsung NSUNSC.exe+21DA00C ikut bertahan). Kode di 11.2, desain di 7.2 |
 | 5b | Scan nilai awal tidak diketahui + scan rentang nilai (between) | Snapshot terbukti (HP NSUNSC float ketemu, 11 jalur, terverifikasi 1x). Scan Rentang: kode terpasang, belum dites. Lihat 11.5 |
-| 7 | AOB + signature | Kode terpasang, belum dites. Lihat 11.6 |
-| 8 | Tersimpan, sesi JSON, ekspor | Terbukti: Simpan Alamat, kartu Tersimpan membaca nilai tiket NSUNSC secara langsung (ikut berubah di game). Belum dites: Ekspor Profil (klik, lalu cek isi file JSON) |
+| 7 | AOB + signature | Selesai (terbukti di NSUNSC, alamat HP: Cari Kode Pengguna, Buat Signature, Simpan, dan Tes Signature setelah restart game menghasilkan alamat yang sama dengan jalur utama; kartu Tersimpan menampilkan jumlah signature). Cadangan saat jalur putus baru teruji setelah game di-update. Lihat 11.6 |
+| 8 | Tersimpan, sesi JSON, ekspor | Terbukti: Simpan Alamat, kartu Tersimpan membaca nilai tiket NSUNSC secara langsung (ikut berubah di game). Ekspor Profil terbukti (JSON NSUNSC.profile.json valid) |
 | 8b | Tata letak baru + tema terpusat | Selesai (lihat 11.4). Judul halaman putih terbukti di Proses dan Signature; semua halaman memakai Themes\AppStyles.xaml |
-| 9 | Trainer (`Ramreader.Trainer`) | Belum |
+| 9A | Trainer: scaffold, `AddressResolver` di Core, Trainer membaca profil NSUNSC (HP, tiket) | Terbukti: Trainer membaca HP dan tiket NSUNSC. Kartu Tersimpan Ramreader setelah refactor 9c belum dilaporkan terpisah. Lihat 11.7 |
+| 9B | Trainer: Set nilai dengan validasi + Freeze | Terbukti di NSUNSC: Set HP/tiket jalan, Freeze menahan HP di layar, stabil walau match diulang. Temuan: nilai tetap turun sesaat sebelum dikembalikan. Belum dites: tutup lalu buka ulang game. Lihat 11.8 |
+| 9C | Trainer: pengaturan per fitur (nama, min/max, preset) + hotkey global + kecepatan kunci | Kode terpasang, belum dites. Lihat 11.9 |
+| 9D | Trainer: god mode lewat code patch (NOP); debugger Penulis Kode di Ramreader, kartu God Mode di Trainer, UI Trainer didesain ulang | Terbukti di NSUNSC: HP tidak turun lagi saat God Mode aktif (patch movss F3 0F 11 41 10 di NSUNSC.exe+94BAE2). Belum dites: musuh ikut kebal, restart game, pengembalian byte saat Trainer ditutup. Lihat 11.10 |
 
 ## 10. Catatan dan risiko
 
@@ -278,7 +289,40 @@ App:
 ### 11.6 Signature (Langkah 7)
 Core: `Models\SignatureRef` (Pattern, DispOffset, InstructionEnd, StaticDelta, Offsets, Note); `SavedAddress.Signatures` (maks 5 per alamat, ikut di JSON ekspor). `Scanning\`: `AobPattern` (parse/Create, wildcard `??`), `AobScanner` (modul utama, chunk 16 MB + overlap, tanpa hasil ganda), `RipReferenceScanner` (cari instruksi `[rip+disp32]` yang merujuk alamat statis jalur: ModRM mod=00 rm=101, tebakan ukuran immediate dari opcode), `SignatureMaker` (`MakeExact` dari alamat instruksi, 8..48 byte persis; `MakeForReference` jendela terpendek yang unik dengan disp32 jadi `??`), `SignatureResolver` (pola -> disp32 -> alamat RIP + StaticDelta -> ikuti Offsets; lokasi pola di-cache per PID, pemindaian pertama di latar).
 App: `SignatureViewModel` + `SignaturePage` (pilih alamat tersimpan -> Cari Kode Pengguna -> Buat Signature -> Uji Pola -> Simpan ke Alamat; Tes Signature; Buat dari Alamat = jalur Cheat Engine). Simpan menolak pola yang tidak unik atau yang alamatnya beda dari jalur utama. `SavedItem.Update` memakai signature kalau semua jalur putus.
+Terbukti di NSUNSC (alamat HP): pola unik di modul utama, hasilnya sama dengan jalur utama, dan tetap benar setelah restart game (ASLR). Cadangan saat jalur putus belum pernah teruji karena game belum di-update.
 Keterbatasan: pola yang memuat instruksi relatif lain (call/jmp rel32) bisa patah setelah update; hanya terbukti nyata kalau game di-update. Hanya jalur berakar di modul utama. Signature dari "Buat dari Alamat" hanya menemukan lokasi kode (bahan patch kode fase 2).
+
+### 11.7 Trainer: dasar dan membaca (Langkah 9A)
+- Keputusan desain: satu trainer generik (`src\Ramreader.Trainer`) untuk semua game. Isi tiap game = profil JSON dari Ramreader (data, bukan kode). Pengaturan trainer (nama tampil, min/max, hotkey; Paket C) disimpan terpisah dari profil di `%AppData%\Ramreader.Trainer\settings\<game>.json` berkunci Label alamat, supaya ekspor ulang profil tidak menghapusnya.
+- Core: `Pointers\AddressResolver.Resolve(memory, chains, signatures, type)` mengembalikan `ResolveResult` (Status Ok/SignatureSearching/Failed, Source Chain/Signature, Index, Address, Raw). Ini satu-satunya tempat logika "coba tiap jalur berurutan, kalau semua putus coba signature"; dipakai `SavedItem.Update` (Ramreader) dan `FeatureItem.Update` (Trainer).
+- Trainer: `TrainerSession` (koneksi baca, watchdog 1,5 detik), `ProfileStore` (membaca `%AppData%\Ramreader\sessions\*.json` dan file ekspor `GameProfile`), `FeatureItem` (satu alamat = satu fitur), `MainViewModel` (daftar profil, sambung otomatis ke proses yang namanya sama dengan nama profil, timer 1 detik, peringatan kalau ukuran exe beda dari `MainModuleSize`).
+- UI: `MainWindow` satu halaman (FluentWindow, Mica) memakai `Themes\AppStyles.xaml` salinan dari Ramreader.App. Kalau gaya diubah di satu aplikasi, salin ke yang lain.
+
+### 11.8 Trainer: Set nilai dan Freeze (Langkah 9B)
+- `Services\MemoryWriter`: satu-satunya kode di solusi yang menulis ke game. Handle dibuka dengan `PROCESS_VM_WRITE | PROCESS_VM_OPERATION` saat Trainer terhubung. Kalau ditolak, pembacaan tetap jalan dan alasannya ada di `TrainerSession.WriterError`. Core dan Ramreader tetap read-only.
+- Validasi sebelum menulis (sejak Paket C bisa diatur per fitur, lihat 11.9; bawaan 0 sampai 1.000.000.000): rentang aman 0 sampai 1.000.000.000, bukan NaN/Infinity. Nilai baru di luar rentang ditolak. Nilai sekarang di alamat juga harus di dalam rentang; kalau tidak, alamat dianggap salah dan tidak ada yang ditulis.
+- Set: parse sesuai tipe (`ValueCodec.TryParse`), resolusi ulang alamat saat itu juga lewat `AddressResolver` (tidak memakai alamat lama), tulis, lalu baca ulang. Kalau hasil baca ulang beda, pesan menyebut game kemungkinan menimpa nilainya.
+- Freeze (sejak Paket C berjalan di thread latar, lihat 11.9; semula `DispatcherTimer` 50 ms) menulis nilai kunci dengan resolusi ulang alamat di tiap tick (supaya tidak menulis ke alamat basi). Nilai kunci = isi kotak nilai, atau nilai sekarang kalau kotak kosong. Kunci ditahan (tidak menulis) selama nilai di alamat di luar rentang aman, dan lepas otomatis saat game putus.
+- Hasil uji di NSUNSC: Set HP dan tiket berhasil; Freeze membuat HP di layar tidak berkurang dan stabil walau match diulang 3 kali. Temuan: nilai sebenarnya tetap turun sesaat lalu dikembalikan (Freeze bekerja setelah kejadian, tidak mencegahnya). Yang membuat nilai tidak pernah turun hanya code patch (Paket D). Belum dites: tutup lalu buka ulang game.
+- Risiko diketahui: game bisa menyimpan nilai di dua tempat (nilai asli dan salinan tampilan), sehingga Set tampak tidak mempan atau ditimpa balik. Solusinya masuk tahap god mode lewat code patch (SPEC 1.5), bukan Paket B. Nama API `ui:ToggleSwitch` di WPF-UI 4.3.0 belum terverifikasi.
+
+### 11.9 Trainer: pengaturan, hotkey, kecepatan kunci (Langkah 9C)
+- Pengaturan per game di `%AppData%\Ramreader.Trainer\settings\<namaproses>.json` (`SettingsStore`: `GameSettings` = `FreezeIntervalMs` + `Features` berkunci Label alamat; `FeatureSettings` = DisplayName, Min, Max, Preset, HotkeySet, HotkeyFreeze, semuanya teks). Terpisah dari profil Ramreader supaya ekspor ulang profil tidak menghapusnya. Disimpan otomatis tiap kolom Pengaturan selesai diedit.
+- Rentang aman per fitur dari Min/Max (bawaan 0 dan 1.000.000.000). Kalau Min/Max bukan angka atau Min > Max, semua penulisan fitur itu ditolak sampai diperbaiki.
+- Preset: nilai untuk hotkey Set (kalau kosong dipakai isi kotak nilai). Tombol Set memakai isi kotak nilai, dan kalau kosong memakai Preset.
+- Hotkey global (`Services\HotkeyService`, `RegisterHotKey` + hook WM_HOTKEY, MOD_NOREPEAT): dua per fitur, Set dan Kunci (toggle freeze). Format `F1`, `Ctrl+F2`, `Alt+Shift+K`. Didaftar ulang tiap pengaturan berubah. Gagal daftar (dipakai program lain atau fitur lain) tampil di baris status fitur.
+- Kecepatan kunci (pengaturan per game): 50 / 20 / 10 (bawaan) / 5 ms. Freeze berjalan di thread latar (`MainViewModel.FreezeLoop`, `timeBeginPeriod(1)`), bukan `DispatcherTimer` (resolusi sekitar 15 ms). Daftar fitur untuk thread diganti sebagai array baru tiap profil berganti, jadi tidak pernah dienumerasi saat berubah.
+- Keterbatasan: Freeze tidak mencegah nilai turun, hanya mengembalikannya. Selisih satu frame game (sekitar 16 ms di 60 fps) masih mungkin, termasuk serangan yang langsung membunuh. Nilai yang benar-benar tidak turun = Paket D (code patch), butuh alamat instruksi yang menulis HP ("find out what writes"): dari Cheat Engine, atau debugger hardware breakpoint di Ramreader (backlog 4).
+- Belum terverifikasi: tampilan `Expander` bawaan WPF-UI di tema gelap, dan `KeyConverter` untuk tombol angka di hotkey.
+
+### 11.10 God mode lewat code patch (Langkah 9D)
+- Core `Debugging\`: `WriteTracer` (hardware breakpoint tulis DR0 di semua thread lewat DebugActiveProcess; instruksi penulis ditemukan dengan disassembler Iced, dicocokkan lewat alamat efektif; kolom Hit/Berubah/Turun membedakan penulis damage dari penulis rutin), `CodePatchMaker` (signature unik, byte instruksi dan operand relatif jadi ??), `CodePatchLocator` (cari lokasi, cek byte asli/patch). Model `CodePatch` di `SavedAddress.CodePatches`, ikut di profil ekspor.
+- Ramreader: halaman Penulis Kode (Mulai Pantau, Berhenti, Buat Patch). Ramreader tetap tidak menulis memori game, tetapi selama Pantau ia menempel sebagai debugger dan mengubah debug register thread game; semua dilepas saat berhenti.
+- Trainer: `MemoryWriter.WriteCode` (thread game dijeda, VirtualProtectEx, FlushInstructionCache). `PatchItem`: byte di lokasi harus sama dengan OriginalBytes (atau PatchBytes), kalau tidak ditolak ("game di-update"). Patch dikembalikan otomatis saat Trainer ditutup atau profil diganti. Hotkey patch di `GameSettings.Patches`.
+- UI Trainer: satu area gulir (ItemsControl), kartu fitur dan kartu God Mode di satu daftar, pengaturan fitur di panel samping.
+- Hasil uji di NSUNSC: Mulai Pantau menangkap 3 instruksi penulis HP (NSUNSC.exe+94BAE2, +94BAE3, +94BAE4; Hit 20, Berubah 11, Turun 5 sama di ketiganya, jadi kemungkinan tafsir berbeda dari byte yang sama di alamat berdekatan). Patch belum pernah tersimpan (CodePatches kosong di NSUNSC.json), jadi God Mode belum teruji. Pilih baris terpanjang (movss, 5 byte), bukan baris adc/movups yang hanya potongannya.
+- Hasil uji final di NSUNSC: tiga baris penangkap (movss/movups/adc) ternyata satu instruksi; patch yang benar adalah movss 5 byte (OriginalBytes F3 0F 11 41 10, PatchBytes 90 x5). Dengan God Mode aktif HP tidak turun lagi di setiap hit (dilaporkan user, screenshot Trainer). Patch dari baris adc (3 byte) terpotong dan salah; pilih selalu baris terpanjang.
+- Keterbatasan: NOP polos membuat semua karakter yang memakai instruksi itu kebal (musuh juga) dan penyembuhan lewat instruksi yang sama ikut mati. Perbaikan: code cave khusus pemain (9De, belum).
 
 ## 12. Catatan lapangan dan backlog
 
@@ -296,3 +340,4 @@ Keterbatasan: pola yang memuat instruksi relatif lain (call/jmp rel32) bisa pata
 - Scan "gagal" (hasil 0 atau angka acak seperti -842150451) pertama-tama cek bilah status: Ramreader mungkin tersambung ke proses yang salah (pernah ke msedge). Angka kecil seperti jumlah tiket muncul di banyak tempat; pakai nilai yang panjang/unik lebih dulu (mis. uang), lalu Scan Lanjutan.
 - Alamat yang sama persis di dua sesi game dan berawalan 0x7FF7 (area exe) biasanya alamat statis: Pointer scan menemukannya sebagai jalur "langsung" (modul+offset), tanpa pointer berantai. Yang membuktikan stabil adalah angka offset dari modul, bukan alamat mentahnya.
 - Pembaruan SPEC.md selalu pakai Sebelum/Sesudah (lihat aturan 13 di bagian 2).
+- Repo: github.com/fathun12/Ramreader (branch main). CI build di `.github\workflows\build.yml` (windows-latest, .NET 10). About, topik, dan rilis diatur lewat `gh` (GitHub CLI). Tiap kali satu langkah terbukti: update SPEC.md, lalu commit dengan pesan gaya `feat: ... (Langkah N)` dan push.

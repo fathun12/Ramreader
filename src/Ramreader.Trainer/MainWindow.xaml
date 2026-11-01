@@ -1,0 +1,343 @@
+﻿<ui:FluentWindow x:Class="Ramreader.Trainer.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:vm="clr-namespace:Ramreader.Trainer.ViewModels"
+                 Title="Ramreader Trainer"
+                 Width="1100" Height="760"
+                 MinWidth="880" MinHeight="600"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round"
+                 WindowStartupLocation="CenterScreen">
+    <Grid TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Ramreader Trainer" />
+
+        <Grid Grid.Row="1" Style="{StaticResource PageRoot}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Kolom kiri: bagian atas tetap, hanya daftar kartu yang digulir -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <StackPanel Margin="0,0,0,16">
+                        <ui:TextBlock Text="Trainer" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Pilih game dari profil yang dibuat Ramreader. Trainer menyambung otomatis begitu game berjalan."
+                                   Margin="0,6,0,0"
+                                   Style="{StaticResource MutedText}" />
+                    </StackPanel>
+
+                    <ui:InfoBar Margin="0,0,0,12"
+                                Severity="Informational"
+                                Title="Belum ada profil"
+                                Message="Simpan alamat di Ramreader (menu Jalur Stabil, tombol Simpan Alamat), atau klik Buka Profil untuk file hasil ekspor."
+                                IsOpen="{Binding NoProfiles, Mode=OneWay}"
+                                IsClosable="False" />
+
+                    <ui:InfoBar Margin="0,0,0,12"
+                                Severity="Warning"
+                                Title="Perhatian"
+                                Message="{Binding Message}"
+                                IsOpen="{Binding HasMessage, Mode=OneWay}"
+                                IsClosable="False" />
+
+                    <ui:InfoBar Margin="0,0,0,12"
+                                Severity="Warning"
+                                Title="Versi game berbeda"
+                                Message="{Binding VersionWarning}"
+                                IsOpen="{Binding HasVersionWarning, Mode=OneWay}"
+                                IsClosable="False" />
+
+                    <Border Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Game (profil)" Style="{StaticResource FieldLabel}" />
+                                <ComboBox ItemsSource="{Binding Profiles}"
+                                          SelectedItem="{Binding SelectedProfile}"
+                                          DisplayMemberPath="DisplayName" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                <TextBlock Text="Kecepatan kunci" Style="{StaticResource FieldLabel}" />
+                                <ComboBox ItemsSource="{Binding FreezeSpeeds}"
+                                          SelectedItem="{Binding SelectedSpeed}"
+                                          DisplayMemberPath="Label" />
+                            </StackPanel>
+
+                            <ui:Button Grid.Column="2"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Bottom"
+                                       Content="Segarkan"
+                                       Command="{Binding RefreshProfilesCommand}" />
+
+                            <ui:Button Grid.Column="3"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Bottom"
+                                       Content="Buka Profil..."
+                                       Command="{Binding OpenProfileCommand}" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Satu-satunya area gulir -->
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Cards}" Margin="0,0,12,0">
+                        <ItemsControl.Resources>
+
+                            <!-- Kartu nilai (HP, tiket, ...) -->
+                            <DataTemplate DataType="{x:Type vm:FeatureItem}">
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="16"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding StatusText}"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="12"
+                                                           Style="{StaticResource MutedText}" />
+                                            </StackPanel>
+
+                                            <ui:TextBlock Grid.Column="1"
+                                                          Text="{Binding ValueText}"
+                                                          FontTypography="Title"
+                                                          Margin="16,0,0,0"
+                                                          VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <Grid Margin="0,14,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                <ui:TextBox Width="160"
+                                                            PlaceholderText="Nilai baru"
+                                                            Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" />
+                                                <ui:Button Margin="8,0,0,0"
+                                                           Content="Set"
+                                                           Appearance="Primary"
+                                                           Command="{Binding ApplyCommand}" />
+                                                <ui:ToggleSwitch Margin="20,0,0,0"
+                                                                 VerticalAlignment="Center"
+                                                                 Content="Kunci nilai"
+                                                                 IsChecked="{Binding IsFrozen, Mode=TwoWay}" />
+                                            </StackPanel>
+
+                                            <ui:Button Grid.Column="1"
+                                                       Content="Pengaturan"
+                                                       Command="{Binding OpenSettingsCommand}" />
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding ActionText}"
+                                                   Margin="0,8,0,0"
+                                                   FontSize="12"
+                                                   Style="{StaticResource MutedText}" />
+                                        <TextBlock Text="{Binding HotkeyStatus}"
+                                                   Margin="0,2,0,0"
+                                                   FontSize="12"
+                                                   Style="{StaticResource MutedText}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
+                            <!-- Kartu God Mode (code patch) -->
+                            <DataTemplate DataType="{x:Type vm:PatchItem}">
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="16"
+                                                           FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Detail}"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="12"
+                                                           Style="{StaticResource MutedText}" />
+                                            </StackPanel>
+
+                                            <ui:ToggleSwitch Grid.Column="1"
+                                                             Margin="16,0,0,0"
+                                                             VerticalAlignment="Center"
+                                                             Content="Aktif"
+                                                             IsChecked="{Binding IsOn, Mode=TwoWay}" />
+                                        </Grid>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                            <TextBlock Text="Hotkey"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,10,0"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <ui:TextBox Width="120"
+                                                        PlaceholderText="mis. F3"
+                                                        Text="{Binding HotkeyText, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   Margin="0,8,0,0"
+                                                   FontSize="12"
+                                                   Style="{StaticResource MutedText}" />
+                                        <TextBlock Text="{Binding HotkeyStatus}"
+                                                   Margin="0,2,0,0"
+                                                   FontSize="12"
+                                                   Style="{StaticResource MutedText}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
+                        </ItemsControl.Resources>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Kolom kanan: panel pengaturan fitur (muncul saat tombol Pengaturan diklik) -->
+            <Border Grid.Column="1"
+                    Width="320"
+                    Margin="16,0,0,0"
+                    VerticalAlignment="Top">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource CardBorder}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SettingsFeature}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="Pengaturan" Style="{StaticResource FieldLabel}" Margin="0" />
+                            <TextBlock Text="{Binding SettingsFeature.Title}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <ui:Button Grid.Column="1"
+                                   Content="Tutup"
+                                   Command="{Binding CloseSettingsCommand}" />
+                    </Grid>
+
+                    <StackPanel DataContext="{Binding SettingsFeature}">
+                        <TextBlock Text="Nama tampil" Style="{StaticResource FieldLabel}" />
+                        <ui:TextBox Margin="0,0,0,12"
+                                    Text="{Binding DisplayName, UpdateSourceTrigger=LostFocus}" />
+
+                        <TextBlock Text="Nilai preset (untuk hotkey Set)" Style="{StaticResource FieldLabel}" />
+                        <ui:TextBox Margin="0,0,0,12"
+                                    Text="{Binding PresetText, UpdateSourceTrigger=LostFocus}" />
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Batas minimum" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox Text="{Binding MinText, UpdateSourceTrigger=LostFocus}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Batas maksimum" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox Text="{Binding MaxText, UpdateSourceTrigger=LostFocus}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Hotkey Set" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox PlaceholderText="mis. F1"
+                                            Text="{Binding HotkeySetText, UpdateSourceTrigger=LostFocus}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Hotkey Kunci" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox PlaceholderText="mis. F2"
+                                            Text="{Binding HotkeyFreezeText, UpdateSourceTrigger=LostFocus}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="Batas dipakai sebagai rentang aman: nilai di luar batas tidak akan ditulis. Tersimpan otomatis."
+                                   Margin="0,14,0,0"
+                                   FontSize="12"
+                                   Style="{StaticResource MutedText}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Bilah status -->
+        <Border Grid.Row="2"
+                Padding="16,8"
+                Background="{DynamicResource ControlFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                            <Setter Property="Fill" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Session.IsConnected}" Value="True">
+                                    <Setter Property="Fill" Value="#4CC38A" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Ellipse.Style>
+                </Ellipse>
+                <TextBlock Text="{Binding Session.StatusMessage}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

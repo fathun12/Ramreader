@@ -22,11 +22,13 @@ public partial class App : Application
         services.AddSingleton<SavedStore>();
         services.AddSingleton<SavedViewModel>();
         services.AddSingleton<SignatureViewModel>();
+        services.AddSingleton<CodeWriterViewModel>();
 
         services.AddSingleton<ProcessPage>();
         services.AddSingleton<ScanPage>();
         services.AddSingleton<PointerPage>();
         services.AddSingleton<SignaturePage>();
+        services.AddSingleton<CodeWriterPage>();
         services.AddSingleton<SavedPage>();
 
         Services = services.BuildServiceProvider();

@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/Ramreader.App/Ramreader.App.csproj" />
     <Project Path="src/Ramreader.Core/Ramreader.Core.csproj" />
+    <Project Path="src/Ramreader.Trainer/Ramreader.Trainer.csproj" />
   </Folder>
 </Solution>

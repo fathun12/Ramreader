@@ -1,0 +1,148 @@
+<Page x:Class="Ramreader.App.Views.CodeWriterPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Penulis Kode"
+      Style="{StaticResource AppPage}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Page.Resources>
+
+    <Grid Style="{StaticResource PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <StackPanel Margin="0,0,0,16">
+                <ui:TextBlock Text="Penulis Kode" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Cari instruksi game yang menulis nilai (mis. HP), lalu jadikan patch God Mode untuk Trainer."
+                           Margin="0,6,0,0"
+                           Style="{StaticResource MutedText}" />
+            </StackPanel>
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Warning"
+                        Title="Belum terhubung"
+                        Message="Hubungkan ke game dulu di menu Proses."
+                        IsOpen="{Binding NotConnected, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Warning"
+                        Title="Belum ada alamat tersimpan"
+                        Message="Simpan dulu alamat di menu Jalur Stabil (tombol Simpan Alamat)."
+                        IsOpen="{Binding ShowNoSaved, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Informational"
+                        Title="Info"
+                        Message="{Binding Message}"
+                        IsOpen="{Binding HasMessage, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.4*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Alamat tersimpan yang dipantau" Style="{StaticResource FieldLabel}" />
+                            <ComboBox ItemsSource="{Binding Saved.Items}"
+                                      SelectedItem="{Binding SelectedSaved}"
+                                      DisplayMemberPath="Label" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Nama patch" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox Text="{Binding PatchLabel, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <WrapPanel Margin="0,16,0,0">
+                        <ui:Button Content="Mulai Pantau"
+                                   Margin="0,0,8,8"
+                                   Appearance="Primary"
+                                   ToolTip="Menempel ke game sebagai debugger dan mencatat instruksi yang menulis nilai ini."
+                                   Command="{Binding StartCommand}" />
+                        <ui:Button Content="Berhenti"
+                                   Margin="0,0,8,8"
+                                   Command="{Binding StopCommand}" />
+                        <ui:Button Content="Buat Patch"
+                                   Margin="0,0,8,8"
+                                   Appearance="Primary"
+                                   ToolTip="Buat patch NOP dari baris yang dipilih dan simpan ke alamat ini (ikut di profil Trainer)."
+                                   Command="{Binding MakePatchCommand}" />
+                    </WrapPanel>
+
+                    <TextBlock Text="{Binding Hint}"
+                               Margin="0,4,0,0"
+                               Style="{StaticResource MutedText}" />
+                    <TextBlock Text="Selama Mulai Pantau berjalan, Ramreader menempel ke game sebagai debugger. Jangan dipakai pada game dengan anti-cheat atau game online."
+                               Margin="0,8,0,0"
+                               FontSize="12"
+                               Style="{StaticResource MutedText}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Margin="0,0,0,8">
+                <ProgressBar IsIndeterminate="True"
+                             Height="4"
+                             Margin="0,0,0,8"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding Summary}" Style="{StaticResource MutedText}" />
+            </StackPanel>
+
+            <Grid Margin="16,4,16,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Instruksi" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="1" Text="Lokasi" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="2" Text="Hit" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="3" Text="Berubah" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="4" Text="Turun" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="5" Text="Alamat" Style="{StaticResource ColumnHeader}" />
+            </Grid>
+        </StackPanel>
+
+        <ui:ListView Grid.Row="1"
+                     ItemsSource="{Binding Candidates}"
+                     SelectedItem="{Binding SelectedCandidate}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ui:ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="{Binding InstructionText}" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding LocationText}" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding Hits}" />
+                        <TextBlock Grid.Column="3" Text="{Binding Changes}" />
+                        <TextBlock Grid.Column="4" Text="{Binding Decreases}" />
+                        <TextBlock Grid.Column="5" Text="{Binding MatchText}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </DataTemplate>
+            </ui:ListView.ItemTemplate>
+        </ui:ListView>
+    </Grid>
+</Page>

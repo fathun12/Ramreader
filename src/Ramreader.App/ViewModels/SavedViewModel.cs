@@ -64,43 +64,27 @@ public partial class SavedItem : ObservableObject
             return;
         }
 
-        int size = ValueCodec.SizeOf(Saved.ValueType);
-        for (int i = 0; i < Chains.Count; i++)
+        var result = AddressResolver.Resolve(memory, Chains, Saved.Signatures, Saved.ValueType);
+
+        switch (result.Status)
         {
-            var address = PointerVerifier.Resolve(memory, Chains[i]);
-            if (address is null) continue;
+            case ResolveStatus.Ok when result.Source == ResolveSource.Chain:
+                ValueText = ValueCodec.Format(Saved.ValueType, result.Raw);
+                StatusText = result.Index == 0
+                    ? "Terbaca lewat jalur utama."
+                    : $"Jalur utama gagal, terbaca lewat jalur cadangan #{result.Index + 1}.";
+                return;
 
-            var data = memory.Read(address.Value, size);
-            if (data is null) continue;
+            case ResolveStatus.Ok:
+                ValueText = ValueCodec.Format(Saved.ValueType, result.Raw);
+                StatusText = $"Semua jalur putus, terbaca lewat signature #{result.Index + 1}. " +
+                             "Cari jalur baru lalu simpan lagi supaya jalur ikut diperbarui.";
+                return;
 
-            ValueText = ValueCodec.Format(Saved.ValueType, ValueCodec.ReadRaw(data, 0, size));
-            StatusText = i == 0
-                ? "Terbaca lewat jalur utama."
-                : $"Jalur utama gagal, terbaca lewat jalur cadangan #{i + 1}.";
-            return;
-        }
-
-        // Semua jalur putus: coba signature (tahan terhadap update game).
-        for (int s = 0; s < Saved.Signatures.Count; s++)
-        {
-            var result = SignatureResolver.Resolve(memory, Saved.Signatures[s]);
-
-            if (result.State == SignatureState.Searching)
-            {
+            case ResolveStatus.SignatureSearching:
                 ValueText = "...";
                 StatusText = "Semua jalur putus. Mencari lewat signature (sekali saja, bisa beberapa detik)...";
                 return;
-            }
-
-            if (result.Address is null) continue;
-
-            var bytes = memory.Read(result.Address.Value, size);
-            if (bytes is null) continue;
-
-            ValueText = ValueCodec.Format(Saved.ValueType, ValueCodec.ReadRaw(bytes, 0, size));
-            StatusText = $"Semua jalur putus, terbaca lewat signature #{s + 1}. " +
-                         "Cari jalur baru lalu simpan lagi supaya jalur ikut diperbarui.";
-            return;
         }
 
         ValueText = "?";
