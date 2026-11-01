@@ -3,34 +3,67 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Ramreader.Core.Debugging;
 using Ramreader.Core.Memory;
 using Ramreader.Core.Models;
+using Ramreader.Core.Pointers;
 using Ramreader.Trainer.Services;
 
 namespace Ramreader.Trainer.ViewModels;
 
-/// <summary>Satu code patch (God Mode) di trainer: cari lokasi lewat signature, cek byte, tulis, kembalikan.</summary>
+/// <summary>
+/// Satu code patch di trainer. Mode bawaan: code cave "pemain saja" (musuh tetap bisa dikalahkan).
+/// Mode "Nop": NOP polos (semua karakter yang memakai instruksi itu ikut kebal).
+/// </summary>
 public partial class PatchItem : ObservableObject
 {
     private readonly CodePatch _patch;
+    private readonly SavedAddress _owner;
+    private readonly List<PointerChain> _chains = new();
     private readonly TrainerSession _session;
     private readonly object _lock = new();
+    private readonly bool _playerOnly;
+    private readonly CaveInfo? _cave;
+    private readonly string _caveError = "";
 
     private ulong? _address;
+    private ulong _caveAddr;
+    private int _slotOffset;
+    private ulong _lastSlot;
     private int _pid;
     private int _searchedPid;
     private volatile bool _searching;
+    private volatile bool _active;
     private string _searchError = "";
     private bool _syncing;
     private bool _applyingSettings;
 
-    public PatchItem(CodePatch patch, TrainerSession session)
+    public PatchItem(CodePatch patch, SavedAddress owner, TrainerSession session)
     {
         _patch = patch;
+        _owner = owner;
         _session = session;
+
+        foreach (var line in owner.Chains)
+        {
+            if (PointerChain.TryParse(line, out var chain)) _chains.Add(chain);
+        }
+
+        _playerOnly = !string.Equals(patch.Mode, "Nop", StringComparison.OrdinalIgnoreCase);
+        if (_playerOnly)
+        {
+            string error = "";
+            if (CodePatch.TryParseBytes(patch.OriginalBytes, out var original) &&
+                CodeCave.TryAnalyze(original, out var info, out error))
+                _cave = info;
+            else
+                _caveError = error.Length > 0 ? error : "Byte patch di profil rusak.";
+        }
     }
 
     public string Label => _patch.Label;
     public string Title => string.IsNullOrWhiteSpace(_patch.Label) ? "God Mode" : _patch.Label;
-    public string Detail => $"Mengganti instruksi penulis ({_patch.OriginalBytes}) dengan NOP, jadi nilai tidak pernah turun.";
+
+    public string Detail => _playerOnly
+        ? $"Hanya karakter pemain yang kebal; musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
+        : $"NOP polos ({_patch.OriginalBytes}): semua karakter yang memakai instruksi ini ikut kebal.";
 
     public event Action? SettingsChanged;
 
@@ -65,6 +98,47 @@ public partial class PatchItem : ObservableObject
 
     public void HotkeyToggle() => IsOn = !IsOn;
 
+    // ---------- thread latar: menjaga slot "siapa pemain" tetap benar ----------
+
+    public void Tick()
+    {
+        if (!_active || _cave is null) return;
+
+        var memory = _session.Memory;
+        var writer = _session.Writer;
+        if (memory is null || writer is null) return;
+
+        ulong cave, last;
+        int slotOffset;
+        lock (_lock)
+        {
+            cave = _caveAddr;
+            slotOffset = _slotOffset;
+            last = _lastSlot;
+        }
+        if (cave == 0) return;
+
+        var slot = ComputeSlot(memory);
+        if (slot is null || slot.Value == last) return;
+
+        if (writer.Write(cave + (ulong)slotOffset, BitConverter.GetBytes(slot.Value)))
+        {
+            lock (_lock) _lastSlot = slot.Value;
+        }
+    }
+
+    /// <summary>Nilai register basis milik pemain = alamat nilai pemain dikurangi displacement instruksi.</summary>
+    private ulong? ComputeSlot(ProcessMemory memory)
+    {
+        var info = _cave;
+        if (info is null) return null;
+
+        var result = AddressResolver.Resolve(memory, _chains, _owner.Signatures, _owner.ValueType);
+        return result.Status == ResolveStatus.Ok
+            ? unchecked(result.Address - (ulong)info.Disp)
+            : null;
+    }
+
     // ---------- membaca (timer 1 detik) ----------
 
     public void Update(ProcessMemory? memory)
@@ -74,6 +148,8 @@ public partial class PatchItem : ObservableObject
             Address = null;
             _pid = 0;
             _searchedPid = 0;
+            _active = false;
+            lock (_lock) { _caveAddr = 0; _lastSlot = 0; }
             StatusText = "Menunggu game...";
             SetOn(false);
             return;
@@ -83,7 +159,16 @@ public partial class PatchItem : ObservableObject
         {
             _pid = memory.ProcessId;
             Address = null;
+            _active = false;
+            lock (_lock) { _caveAddr = 0; _lastSlot = 0; }
             _searchError = "";
+        }
+
+        if (_playerOnly && _cave is null)
+        {
+            StatusText = "Patch ini tidak bisa dibuat mode pemain-saja: " + _caveError;
+            SetOn(false);
+            return;
         }
 
         var address = Address;
@@ -97,18 +182,23 @@ public partial class PatchItem : ObservableObject
             return;
         }
 
-        var state = CodePatchLocator.Inspect(memory, _patch, address.Value, out string detail);
+        var state = Inspect(memory, address.Value, out string detail);
         switch (state)
         {
             case PatchState.Original:
+                _active = false;
                 StatusText = "Siap. Patch belum aktif.";
                 SetOn(false);
                 break;
             case PatchState.Patched:
-                StatusText = "Patch aktif: nilai tidak akan turun.";
+                _active = true;
+                StatusText = _playerOnly
+                    ? "Patch aktif: hanya karakter pemain yang tidak berkurang."
+                    : "Patch aktif (NOP polos): semua karakter ikut tidak berkurang.";
                 SetOn(true);
                 break;
             default:
+                _active = false;
                 StatusText = detail;
                 SetOn(false);
                 break;
@@ -143,6 +233,42 @@ public partial class PatchItem : ObservableObject
         });
     }
 
+    // ---------- periksa byte di lokasi kode ----------
+
+    private PatchState Inspect(ProcessMemory memory, ulong address, out string detail)
+    {
+        if (!_playerOnly) return CodePatchLocator.Inspect(memory, _patch, address, out detail);
+
+        detail = "";
+        if (!CodePatch.TryParseBytes(_patch.OriginalBytes, out var original))
+        {
+            detail = "Data patch di profil rusak.";
+            return PatchState.Unreadable;
+        }
+
+        var now = memory.Read(address, original.Length);
+        if (now is null)
+        {
+            detail = "Kode di lokasi itu belum terbaca.";
+            return PatchState.Unreadable;
+        }
+
+        if (now.AsSpan().SequenceEqual(original)) return PatchState.Original;
+
+        ulong cave;
+        lock (_lock) cave = _caveAddr;
+        if (now[0] == 0xE9 && cave != 0)
+        {
+            int rel = BitConverter.ToInt32(now, 1);
+            ulong target = unchecked(address + 5UL + (ulong)(long)rel);
+            if (target == cave) return PatchState.Patched;
+        }
+
+        detail = $"Byte di lokasi kode berbeda (ada {CodePatch.ToHex(now)}, seharusnya {CodePatch.ToHex(original)}). " +
+                 "Game sudah di-update, atau patch dari sesi Trainer sebelumnya masih terpasang (kalau Trainer ditutup paksa, restart game).";
+        return PatchState.Mismatch;
+    }
+
     // ---------- aktif / mati ----------
 
     partial void OnIsOnChanged(bool value)
@@ -152,7 +278,9 @@ public partial class PatchItem : ObservableObject
         string error = Apply(value);
         if (error.Length == 0)
         {
-            StatusText = value ? "Patch aktif: nilai tidak akan turun." : "Patch dimatikan.";
+            StatusText = value
+                ? (_playerOnly ? "Patch aktif: hanya karakter pemain yang tidak berkurang." : "Patch aktif (NOP polos).")
+                : "Patch dimatikan.";
             return;
         }
 
@@ -173,36 +301,104 @@ public partial class PatchItem : ObservableObject
             return _session.WriterError.Length > 0 ? _session.WriterError : "Izin menulis belum tersedia.";
 
         var address = Address;
-        if (address is null) return "Lokasi kode belum ditemukan. " + (_searchError.Length > 0 ? _searchError : "Tunggu pencarian selesai.");
+        if (address is null)
+            return "Lokasi kode belum ditemukan. " + (_searchError.Length > 0 ? _searchError : "Tunggu pencarian selesai.");
 
-        var state = CodePatchLocator.Inspect(memory, _patch, address.Value, out string detail);
+        var state = Inspect(memory, address.Value, out string detail);
         if (state is PatchState.Mismatch or PatchState.Unreadable)
             return detail + " Tidak ada yang ditulis.";
 
-        if ((on && state == PatchState.Patched) || (!on && state == PatchState.Original)) return "";
+        if ((on && state == PatchState.Patched) || (!on && state == PatchState.Original))
+        {
+            _active = on;
+            return "";
+        }
 
-        if (!CodePatch.TryParseBytes(on ? _patch.PatchBytes : _patch.OriginalBytes, out var bytes))
+        if (!CodePatch.TryParseBytes(_patch.OriginalBytes, out var original))
             return "Byte patch di profil rusak.";
+
+        byte[] bytes;
+        if (!on)
+        {
+            bytes = original;
+        }
+        else if (_playerOnly)
+        {
+            string prepared = PrepareCave(memory, writer, address.Value, original, out bytes);
+            if (prepared.Length > 0) return prepared;
+        }
+        else if (!CodePatch.TryParseBytes(_patch.PatchBytes, out bytes))
+        {
+            return "Byte patch di profil rusak.";
+        }
 
         if (!writer.WriteCode(address.Value, bytes, out string error)) return error;
 
-        var after = CodePatchLocator.Inspect(memory, _patch, address.Value, out _);
-        return after == (on ? PatchState.Patched : PatchState.Original)
-            ? ""
-            : "Byte sudah ditulis, tetapi saat dibaca ulang berbeda. Game kemungkinan menimpanya.";
+        var after = Inspect(memory, address.Value, out _);
+        if (after != (on ? PatchState.Patched : PatchState.Original))
+            return "Byte sudah ditulis, tetapi saat dibaca ulang berbeda. Game kemungkinan menimpanya.";
+
+        _active = on;
+        return "";
     }
 
-    /// <summary>Kembalikan byte asli (dipanggil saat Trainer ditutup atau profil diganti).</summary>
+    /// <summary>Siapkan cave di memori game dan kembalikan byte lompatan yang akan menimpa instruksi penulis.</summary>
+    private string PrepareCave(ProcessMemory memory, MemoryWriter writer, ulong site, byte[] original, out byte[] jump)
+    {
+        jump = Array.Empty<byte>();
+
+        var info = _cave;
+        if (info is null)
+            return "Patch ini tidak bisa dibuat mode pemain-saja: " + _caveError;
+
+        var slotValue = ComputeSlot(memory);
+        if (slotValue is null)
+            return "Alamat nilai milik pemain belum ditemukan. Masuk ke match dulu, lalu nyalakan lagi.";
+
+        ulong cave;
+        lock (_lock) cave = _caveAddr;
+
+        if (cave == 0)
+        {
+            var allocated = writer.AllocNear(site, 0x1000);
+            if (allocated is null) return "Gagal menyediakan memori dekat kode game untuk patch.";
+            cave = allocated.Value;
+        }
+
+        var code = CodeCave.Build(original, info, cave, site, out int slotOffset);
+        BitConverter.GetBytes(slotValue.Value).CopyTo(code, slotOffset);
+        if (!writer.Write(cave, code)) return "Gagal menulis kode patch ke memori game.";
+
+        long rel = (long)cave - (long)(site + 5);
+        if (rel > int.MaxValue || rel < int.MinValue) return "Memori patch terlalu jauh dari kode game.";
+
+        jump = new byte[original.Length];
+        Array.Fill(jump, (byte)0x90);
+        jump[0] = 0xE9;
+        BitConverter.GetBytes((int)rel).CopyTo(jump, 1);
+
+        lock (_lock)
+        {
+            _caveAddr = cave;
+            _slotOffset = slotOffset;
+            _lastSlot = slotValue.Value;
+        }
+        return "";
+    }
+
+    /// <summary>Kembalikan byte asli (saat Trainer ditutup atau profil diganti). Cave dibiarkan, tidak berbahaya.</summary>
     public void Restore()
     {
         try
         {
+            _active = false;
+
             var memory = _session.Memory;
             var writer = _session.Writer;
             var address = Address;
             if (memory is null || writer is null || address is null) return;
 
-            if (CodePatchLocator.Inspect(memory, _patch, address.Value, out _) == PatchState.Patched &&
+            if (Inspect(memory, address.Value, out _) == PatchState.Patched &&
                 CodePatch.TryParseBytes(_patch.OriginalBytes, out var original))
             {
                 writer.WriteCode(address.Value, original, out _);

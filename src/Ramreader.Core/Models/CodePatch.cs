@@ -20,6 +20,9 @@ public sealed class CodePatch
     public string PatchBytes { get; set; } = "";
 
     public string Note { get; set; } = "";
+
+    /// <summary>Kosong atau "Cave" = hanya karakter pemain yang kebal (bawaan). "Nop" = NOP polos, semua karakter ikut kebal.</summary>
+    public string Mode { get; set; } = "";
     public DateTime CreatedAt { get; set; }
 
     public static string ToHex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));

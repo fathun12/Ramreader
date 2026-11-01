@@ -16,6 +16,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly DispatcherTimer _timer;
     private volatile FeatureItem[] _featureArray = Array.Empty<FeatureItem>();
+    private volatile PatchItem[] _patchArray = Array.Empty<PatchItem>();
     private volatile int _freezeIntervalMs = 10;
     private HotkeyService? _hotkeys;
     private bool _loadingSettings;
@@ -87,6 +88,9 @@ public partial class MainViewModel : ObservableObject
                 {
                     foreach (var feature in _featureArray)
                         feature.FreezeTick();
+
+                    foreach (var patch in _patchArray)
+                        patch.Tick();
                 }
                 catch
                 {
@@ -233,9 +237,9 @@ public partial class MainViewModel : ObservableObject
             Cards.Add(item);
         }
 
-        foreach (var codePatch in value.Addresses.SelectMany(a => a.CodePatches))
+        foreach (var (ownerAddress, codePatch) in value.Addresses.SelectMany(a => a.CodePatches.Select(p => (a, p))))
         {
-            var patch = new PatchItem(codePatch, Session);
+            var patch = new PatchItem(codePatch, ownerAddress, Session);
             if (settings.Patches.TryGetValue(codePatch.Label, out var storedPatch))
                 patch.ApplySettings(storedPatch);
 
@@ -245,6 +249,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         _featureArray = Features.ToArray();
+        _patchArray = Patches.ToArray();
 
         // Pindah ke game lain: putuskan koneksi lama.
         if (Session.Memory is { } memory &&

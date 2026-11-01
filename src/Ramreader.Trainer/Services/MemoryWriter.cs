@@ -111,6 +111,25 @@ public sealed class MemoryWriter : IDisposable
         }
     }
 
+    /// <summary>Sediakan memori RWX di game, dalam jangkauan lompatan 32-bit dari alamat near. Null kalau gagal.</summary>
+    public ulong? AllocNear(ulong near, int size)
+    {
+        if (_handle == IntPtr.Zero) return null;
+        const ulong step = 0x10000;
+        for (ulong i = 1; i < 0x7000; i++)
+        {
+            ulong delta = i * step;
+            if (near > delta)
+            {
+                var below = VirtualAllocEx(_handle, (nuint)(near - delta), (nuint)size, 0x3000, PageExecuteReadWrite);
+                if (below != 0) return (ulong)below;
+            }
+            var above = VirtualAllocEx(_handle, (nuint)(near + delta), (nuint)size, 0x3000, PageExecuteReadWrite);
+            if (above != 0) return (ulong)above;
+        }
+        return null;
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -149,4 +168,7 @@ public sealed class MemoryWriter : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint ResumeThread(IntPtr thread);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern nuint VirtualAllocEx(IntPtr process, nuint address, nuint size, uint allocationType, uint protect);
 }
