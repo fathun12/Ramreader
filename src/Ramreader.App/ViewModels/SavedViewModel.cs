@@ -34,7 +34,11 @@ public partial class SavedItem : ObservableObject
 
     public string DetailText =>
         $"{Chains.Count} jalur  •  {TypeName(Saved.ValueType)}  •  " +
-        (Saved.VerifiedRounds > 0 ? $"terverifikasi {Saved.VerifiedRounds}x" : "belum diverifikasi");
+        (Saved.VerifiedRounds > 0 ? $"terverifikasi {Saved.VerifiedRounds}x" : "belum diverifikasi") +
+        (Saved.Signatures.Count > 0 ? $"  •  {Saved.Signatures.Count} signature" : "");
+
+    /// <summary>Panggil setelah daftar signature berubah supaya teks detail kartu diperbarui.</summary>
+    public void NotifyDetailChanged() => OnPropertyChanged(nameof(DetailText));
 
     [ObservableProperty]
     private string _valueText = "-";
@@ -76,8 +80,31 @@ public partial class SavedItem : ObservableObject
             return;
         }
 
+        // Semua jalur putus: coba signature (tahan terhadap update game).
+        for (int s = 0; s < Saved.Signatures.Count; s++)
+        {
+            var result = SignatureResolver.Resolve(memory, Saved.Signatures[s]);
+
+            if (result.State == SignatureState.Searching)
+            {
+                ValueText = "...";
+                StatusText = "Semua jalur putus. Mencari lewat signature (sekali saja, bisa beberapa detik)...";
+                return;
+            }
+
+            if (result.Address is null) continue;
+
+            var bytes = memory.Read(result.Address.Value, size);
+            if (bytes is null) continue;
+
+            ValueText = ValueCodec.Format(Saved.ValueType, ValueCodec.ReadRaw(bytes, 0, size));
+            StatusText = $"Semua jalur putus, terbaca lewat signature #{s + 1}. " +
+                         "Cari jalur baru lalu simpan lagi supaya jalur ikut diperbarui.";
+            return;
+        }
+
         ValueText = "?";
-        StatusText = "Tidak ada jalur yang bisa dibaca di game sekarang. Mungkin game belum sampai layar yang memuat nilai ini, atau game sudah di-update.";
+        StatusText = "Tidak ada jalur atau signature yang bisa dibaca di game sekarang. Mungkin game belum sampai layar yang memuat nilai ini, atau game sudah di-update.";
     }
 }
 
@@ -157,6 +184,18 @@ public partial class SavedViewModel : ObservableObject
 
         Persist();
         NotifyList();
+    }
+
+    /// <summary>Tambah signature ke alamat tersimpan. Pola yang sama menggantikan yang lama; maksimal 5 per alamat.</summary>
+    public void AttachSignature(SavedItem item, SignatureRef signature)
+    {
+        var list = item.Saved.Signatures;
+        list.RemoveAll(s => string.Equals(s.Pattern, signature.Pattern, StringComparison.Ordinal));
+        list.Add(signature);
+        while (list.Count > 5) list.RemoveAt(0);
+
+        item.NotifyDetailChanged();
+        Persist();
     }
 
     // ---------- perintah ----------

@@ -21,6 +21,7 @@ public partial class App : Application
         services.AddSingleton<ChainStore>();
         services.AddSingleton<SavedStore>();
         services.AddSingleton<SavedViewModel>();
+        services.AddSingleton<SignatureViewModel>();
 
         services.AddSingleton<ProcessPage>();
         services.AddSingleton<ScanPage>();

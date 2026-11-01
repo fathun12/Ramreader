@@ -16,4 +16,7 @@ public sealed class SavedAddress
 
     /// <summary>Jalur dalam format PointerChain.Serialize(), jalur terbaik di urutan pertama.</summary>
     public List<string> Chains { get; set; } = new();
+
+    /// <summary>Signature cadangan kalau semua jalur putus (mis. setelah game di-update).</summary>
+    public List<SignatureRef> Signatures { get; set; } = new();
 }

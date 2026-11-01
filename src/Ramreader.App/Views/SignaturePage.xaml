@@ -4,12 +4,195 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Title="Signature"
       Style="{StaticResource AppPage}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Page.Resources>
+
     <Grid Style="{StaticResource PageRoot}">
-        <StackPanel>
-            <ui:TextBlock Text="Signature" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Buat dan uji pola byte (AOB) dari kode game."
-                       Margin="0,6,0,0"
-                       Style="{StaticResource MutedText}" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Bagian atas: tetap di tempat -->
+        <StackPanel Grid.Row="0">
+            <StackPanel Margin="0,0,0,16">
+                <ui:TextBlock Text="Signature" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Buat pola byte (AOB) dari kode game supaya alamat bisa ditemukan lagi setelah game di-update."
+                           Margin="0,6,0,0"
+                           Style="{StaticResource MutedText}" />
+            </StackPanel>
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Warning"
+                        Title="Belum terhubung"
+                        Message="Hubungkan ke game dulu di menu Proses."
+                        IsOpen="{Binding NotConnected, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Warning"
+                        Title="Belum ada alamat tersimpan"
+                        Message="Simpan dulu alamat di menu Jalur Stabil (tombol Simpan Alamat)."
+                        IsOpen="{Binding ShowNoSaved, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        Severity="Informational"
+                        Title="Info"
+                        Message="{Binding Message}"
+                        IsOpen="{Binding HasMessage, Mode=OneWay}"
+                        IsClosable="False" />
+
+            <!-- Kartu kontrol -->
+            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.4*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Alamat tersimpan" Style="{StaticResource FieldLabel}" />
+                            <ComboBox ItemsSource="{Binding Saved.Items}"
+                                      SelectedItem="{Binding SelectedSaved}"
+                                      DisplayMemberPath="Label" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Jarak ke alamat statis" Style="{StaticResource FieldLabel}" />
+                            <ComboBox ItemsSource="{Binding DeltaOptions}"
+                                      SelectedItem="{Binding SelectedDelta}"
+                                      DisplayMemberPath="Label" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Pola (ganti byte yang berubah antar versi dengan ??)"
+                                       Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox PlaceholderText="48 8B 05 ?? ?? ?? ?? 48 85 C0"
+                                        FontFamily="Consolas"
+                                        Text="{Binding PatternText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Alamat instruksi (opsional)" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox PlaceholderText="NSUNSC.exe+1A2B3C4"
+                                        FontFamily="Consolas"
+                                        Text="{Binding InstructionInput, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <WrapPanel Margin="0,16,0,0">
+                        <ui:Button Content="Cari Kode Pengguna"
+                                   Margin="0,0,8,8"
+                                   Appearance="Primary"
+                                   ToolTip="Cari bagian kode game yang memakai alamat statis jalur utama alamat tersimpan."
+                                   Command="{Binding FindRefsCommand}" />
+                        <ui:Button Content="Buat Signature"
+                                   Margin="0,0,8,8"
+                                   ToolTip="Buat pola unik dari baris kandidat yang dipilih di daftar."
+                                   Command="{Binding MakeCommand}" />
+                        <ui:Button Content="Uji Pola"
+                                   Margin="0,0,8,8"
+                                   ToolTip="Hitung di berapa tempat pola ini cocok di kode game."
+                                   Command="{Binding TestCommand}" />
+                        <ui:Button Content="Simpan ke Alamat"
+                                   Margin="0,0,8,8"
+                                   Appearance="Primary"
+                                   Command="{Binding SaveCommand}" />
+                        <ui:Button Content="Tes Signature"
+                                   Margin="0,0,8,8"
+                                   ToolTip="Cari alamat lewat signature yang sudah tersimpan dan bandingkan dengan jalur utama."
+                                   Command="{Binding TestSavedCommand}" />
+                        <ui:Button Content="Buat dari Alamat"
+                                   Margin="0,0,8,8"
+                                   ToolTip="Buat pola dari alamat instruksi yang diisi di kolom kanan (mis. dari Cheat Engine)."
+                                   Command="{Binding MakeFromAddressCommand}" />
+                    </WrapPanel>
+
+                    <TextBlock Text="{Binding Hint}"
+                               Margin="0,4,0,0"
+                               Style="{StaticResource MutedText}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Progres + ringkasan -->
+            <StackPanel Margin="0,0,0,8">
+                <ProgressBar Minimum="0"
+                             Maximum="1"
+                             Height="4"
+                             Margin="0,0,0,8"
+                             Value="{Binding ScanProgress, Mode=OneWay}"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Text="{Binding Summary}"
+                               Style="{StaticResource MutedText}" />
+
+                    <ui:Button Grid.Column="1"
+                               Content="Batal"
+                               Command="{Binding CancelCommand}"
+                               Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Judul kolom -->
+            <Grid Margin="16,4,16,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Lokasi kode" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="1" Text="Selisih" Style="{StaticResource ColumnHeader}" />
+                <TextBlock Grid.Column="2" Text="Byte di sekitar" Style="{StaticResource ColumnHeader}" />
+            </Grid>
         </StackPanel>
+
+        <!-- Hanya daftar kandidat yang digulir -->
+        <ui:ListView Grid.Row="1"
+                     ItemsSource="{Binding Candidates}"
+                     SelectedItem="{Binding SelectedCandidate}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ui:ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding LocationText}"
+                                   FontFamily="Consolas" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding DeltaText}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding BytesText}"
+                                   FontFamily="Consolas"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </DataTemplate>
+            </ui:ListView.ItemTemplate>
+        </ui:ListView>
     </Grid>
 </Page>
