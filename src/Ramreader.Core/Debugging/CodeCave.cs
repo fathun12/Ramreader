@@ -194,5 +194,83 @@ public static class CodeCave
         return bytes;
     }
 
+    /// <summary>
+    /// Cave tim: bandingkan beberapa dword berurutan di objek ([reg+firstOffset], +4, +8, ...) dengan penanda pemain.
+    /// Semua sama = satu tim (penulisan dilewati); ada yang beda = musuh (instruksi asli jalan).
+    /// Blok data (24 byte) di dataOffset: +0 dilewati, +4 dijalankan, +8 objek terakhir dilewati, +16 objek terakhir dijalankan.
+    /// </summary>
+    public static byte[] BuildTeamDiagMulti(byte[] original, CaveInfo info, int firstOffset, uint[] markers,
+        ulong caveAddress, ulong instructionAddress, out int[] immOffsets, out int dataOffset)
+    {
+        int n = original.Length;
+        ulong ret = instructionAddress + (ulong)n;
+        int reg = info.BaseReg;
+        var code = new List<byte>(160);
+        var fixups = new List<(int Pos, int Slot)>();
+        var jnes = new List<int>();
+        immOffsets = new int[markers.Length];
+
+        void RipRef(int slot)
+        {
+            fixups.Add((code.Count, slot));
+            code.AddRange(new byte[4]);
+        }
+        void IncDword(int slot)
+        {
+            code.Add(0xFF);
+            code.Add(0x05);
+            RipRef(slot);
+        }
+        void StoreReg(int slot)
+        {
+            code.Add((byte)(0x48 | (reg >= 8 ? 4 : 0)));
+            code.Add(0x89);
+            code.Add((byte)(0x05 | ((reg & 7) << 3)));
+            RipRef(slot);
+        }
+
+        code.Add(0x9C);                                        // pushfq
+        for (int i = 0; i < markers.Length; i++)
+        {
+            if (reg >= 8) code.Add(0x41);                      // cmp dword [reg+disp32], imm32
+            code.Add(0x81);
+            code.Add((byte)(0xB8 | (reg & 7)));
+            if ((reg & 7) == 4) code.Add(0x24);
+            code.AddRange(BitConverter.GetBytes(firstOffset + i * 4));
+            immOffsets[i] = code.Count;
+            code.AddRange(BitConverter.GetBytes(markers[i]));
+            code.Add(0x75);                                    // jne -> jalan (musuh)
+            jnes.Add(code.Count);
+            code.Add(0);
+        }
+
+        IncDword(0);                                           // satu tim: dilewati++
+        StoreReg(8);
+        code.Add(0x9D);                                        // popfq
+        int j1 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)j1 + 5)));
+
+        int runStart = code.Count;
+        foreach (int at in jnes) code[at] = (byte)(runStart - (at + 1));
+
+        IncDword(4);                                           // musuh: dijalankan++
+        StoreReg(16);
+        code.Add(0x9D);                                        // popfq
+        code.AddRange(original);
+        int j2 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)j2 + 5)));
+
+        dataOffset = (code.Count + 7) & ~7;
+        while (code.Count < dataOffset + 24) code.Add(0);
+
+        var bytes = code.ToArray();
+        foreach (var (pos, slot) in fixups)
+            BitConverter.GetBytes((dataOffset + slot) - (pos + 4)).CopyTo(bytes, pos);
+
+        return bytes;
+    }
+
     private static int Rel(ulong target, ulong next) => checked((int)((long)target - (long)next));
 }
