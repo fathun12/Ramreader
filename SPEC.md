@@ -75,6 +75,8 @@ User berbahasa Indonesia, santai. Kalau ia menulis huruf kapital semua, itu tand
 23. **Jangan pernah mengedit JSON sesi dengan ConvertFrom-Json lalu ConvertTo-Json** (PowerShell 5.1 merusak format tanggal, dan profil hilang dari Trainer; terbukti 2 Nov 2026). Edit file JSON hanya lewat penggantian teks (`[regex]::Replace`), selalu buat cadangan `.bak` dulu, dan cetak jumlah penggantian.
 24. **Jawaban pendek dan hasil dulu.** User sering kehabisan token dan sabar menipis. Mulai dengan jawaban atas pertanyaannya (bisa, tidak bisa, hasilnya apa), lalu detail seperlunya. Jangan menyuruh user mengirim screenshot berulang kalau ada cara yang bisa disalin; kalau tidak ada, tulis bahwa screenshot memang satu-satunya cara.
 
+25. **Setiap fitur penanda sisi harus dites di minimal 3 kondisi berbeda (match sekarang, rematch, ganti karakter lalu match baru) sebelum dicatat terbukti.** Tes satu sesi tidak cukup: nilai +0x44 sudah terbukti berubah antar sesi dan pernah dalam satu proses. Jangan menyuruh user menguji hanya satu sesi lalu menyimpulkan.
+
 ## 3. Lingkungan user
 
 - Windows 11, VS Code, terminal **PowerShell 5.1**, root `D:\Projects\Ramreader`.
@@ -365,6 +367,8 @@ Keterbatasan: pola yang memuat instruksi relatif lain (call/jmp rel32) bisa pata
 - Daftar kandidat tidak bisa disalin; user mengirim screenshot. Usulan (belum dibangun): tombol Salin.
 - Sesi game 5 (PID 12444), instruksi HP +94BAE2 (movss [rcx+10h]) terbukti tertangkap oleh pemindai (kolom Instruksi sebelumnya kosong, itu sebabnya HP gagal). 3 Tim, 3 Musuh, 3 ronde: kandidat +0x3C, +0x44, +0x7BC, +0x7C4. +0x44 bertahan: Tim 0xD70455F6, Musuh 0xC0C13E9D (satu nilai untuk ketiga Musuh; sama dengan sesi 1). +0x7BC/+0x7C4 (Tim 0x1A9, Musuh 0) kemungkinan noise. Penanda +0x44 terbukti ada di objek HP, bukan hanya chakra.
 - Tombol "Tandai Otomatis" (kode terpasang, belum dites): menandai Tim bila [objek+0x44] sama dengan milik "Tim (aku)", Musuh sisanya.
+- Penyebab "HP tidak berfungsi" di Objek Karakter: kolom Instruksi bawaan 94BC94 (chakra) kembali tiap Ramreader dibuka ulang, jadi alamat HP dipasangkan dengan instruksi chakra (terbukti dari screenshot user, sesi PID 12444). Perbaikan (kode terpasang, belum dites): kolom kosong = otomatis dari CodePatches milik alamat tersimpan lewat CodePatchLocator.Find; kolom dikosongkan tiap ganti alamat tersimpan.
+- Stabil lintas rematch/ganti karakter BELUM terbukti; tes tiga kondisi dengan Tandai Otomatis dijadwalkan (aturan 25).
 - Tanda Tim/Musuh dibuat user dengan heuristik (kolom Nilai yang berubah), jadi ada kemungkinan satu objek salah tanda.
 
 **Yang BELUM terbukti (jangan dicatat sebagai terbukti sebelum user melapor).**

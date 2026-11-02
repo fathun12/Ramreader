@@ -58,7 +58,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
     private const int MaxShown = 300;
 
     private const string StartHint =
-        "Langkah 1: pilih alamat tersimpan (mis. Chakra) dan instruksi yang cocok (94BC94 = pengisi chakra). " +
+        "Langkah 1: pilih alamat tersimpan (mis. HP atau Chakra). Kolom Instruksi dikosongkan = otomatis dari patch milik alamat itu. " +
         "Klik Mulai Pantau, biarkan game jalan beberapa detik, lalu Berhenti. Baris \"Tim (aku)\" harus muncul otomatis.";
 
     private const string MarkHint =
@@ -83,7 +83,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
 
     [ObservableProperty] private SavedItem? _selectedSaved;
     [ObservableProperty] private ObjectRow? _selectedObject;
-    [ObservableProperty] private string _instructionText = "94BC94";
+    [ObservableProperty] private string _instructionText = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMessage))]
@@ -116,7 +116,11 @@ public partial class CharacterObjectsViewModel : ObservableObject
     }
 
     partial void OnIsTracingChanged(bool value) => UpdateStates();
-    partial void OnSelectedSavedChanged(SavedItem? value) => UpdateStates();
+    partial void OnSelectedSavedChanged(SavedItem? value)
+    {
+        InstructionText = "";
+        UpdateStates();
+    }
 
     private void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -162,6 +166,27 @@ public partial class CharacterObjectsViewModel : ObservableObject
         var item = SelectedSaved;
         var module = memory?.MainModule;
         if (memory is null || item is null || module is null) return;
+
+        if (string.IsNullOrWhiteSpace(InstructionText))
+        {
+            var patch = item.Saved.CodePatches?.FirstOrDefault();
+            if (patch is null)
+            {
+                Message = "Alamat tersimpan ini belum punya code patch. Buat dulu di menu Penulis Kode, atau ketik offset instruksi manual.";
+                return;
+            }
+
+            Message = "Mencari instruksi dari patch '" + patch.Label + "' lewat signature (beberapa detik)...";
+            var (foundAddress, foundMessage) = await Task.Run(() => CodePatchLocator.Find(memory, patch, CancellationToken.None));
+            if (foundAddress is not { } found)
+            {
+                Message = "Instruksi tidak ditemukan: " + foundMessage;
+                return;
+            }
+
+            InstructionText = (found - module.BaseAddress).ToString("X");
+            Message = "";
+        }
 
         if (!TryParseOffset(InstructionText, out ulong offset))
         {
