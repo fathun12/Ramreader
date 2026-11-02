@@ -61,7 +61,11 @@ public partial class PatchItem : ObservableObject
     public string Label => _patch.Label;
     public string Title => string.IsNullOrWhiteSpace(_patch.Label) ? "God Mode" : _patch.Label;
 
-    public string Detail => _playerOnly
+    private bool IsTeam => string.Equals(_patch.Mode, "Team", StringComparison.OrdinalIgnoreCase);
+
+    public string Detail => IsTeam
+        ? $"Seluruh timmu kebal (dikenali dari penanda di objek); musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
+        : _playerOnly
         ? $"Hanya karakter pemain yang kebal; musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
         : $"NOP polos ({_patch.OriginalBytes}): semua karakter yang memakai instruksi ini ikut kebal.";
 
@@ -118,6 +122,18 @@ public partial class PatchItem : ObservableObject
         }
         if (cave == 0) return;
 
+        if (IsTeam)
+        {
+            var marker = ComputeMarker(memory);
+            if (marker is null || marker.Value == last) return;
+
+            if (writer.Write(cave + (ulong)slotOffset, BitConverter.GetBytes(marker.Value)))
+            {
+                lock (_lock) _lastSlot = marker.Value;
+            }
+            return;
+        }
+
         var slot = ComputeSlot(memory);
         if (slot is null || slot.Value == last) return;
 
@@ -137,6 +153,16 @@ public partial class PatchItem : ObservableObject
         return result.Status == ResolveStatus.Ok
             ? unchecked(result.Address - (ulong)info.Disp)
             : null;
+    }
+
+    /// <summary>Penanda tim milik pemain: isi [objek pemain + MarkerOffset]. Nol dianggap belum valid.</summary>
+    private uint? ComputeMarker(ProcessMemory memory)
+    {
+        var playerBase = ComputeSlot(memory);
+        if (playerBase is null) return null;
+
+        ulong at = unchecked(playerBase.Value + (ulong)(long)_patch.MarkerOffset);
+        return memory.TryRead<uint>(at, out var value) && value != 0 ? (uint?)value : null;
     }
 
     // ---------- membaca (timer 1 detik) ----------
@@ -192,9 +218,12 @@ public partial class PatchItem : ObservableObject
                 break;
             case PatchState.Patched:
                 _active = true;
-                StatusText = _playerOnly
-                    ? "Patch aktif: hanya karakter pemain yang tidak berkurang."
-                    : "Patch aktif (NOP polos): semua karakter ikut tidak berkurang.";
+                StatusText = IsTeam
+                    ? "Patch aktif (mode tim): seluruh timmu tidak berkurang, musuh tetap. Penanda pemain: " +
+                      (ComputeMarker(memory) is { } pm ? $"0x{pm:X8}" : "belum terbaca")
+                    : _playerOnly
+                        ? "Patch aktif: hanya karakter pemain yang tidak berkurang."
+                        : "Patch aktif (NOP polos): semua karakter ikut tidak berkurang.";
                 SetOn(true);
                 break;
             default:
@@ -365,8 +394,23 @@ public partial class PatchItem : ObservableObject
             cave = allocated.Value;
         }
 
-        var code = CodeCave.Build(original, info, cave, site, out int slotOffset);
-        BitConverter.GetBytes(slotValue.Value).CopyTo(code, slotOffset);
+        byte[] code;
+        int slotOffset;
+        ulong slotStore = slotValue.Value;
+        if (IsTeam)
+        {
+            var marker = ComputeMarker(memory);
+            if (marker is null)
+                return "Penanda tim milik pemain belum terbaca (objek pemain belum siap). Masuk ke match, gerakkan karakter, lalu nyalakan lagi.";
+
+            code = CodeCave.BuildTeam(original, info, _patch.MarkerOffset, marker.Value, cave, site, out slotOffset);
+            slotStore = marker.Value;
+        }
+        else
+        {
+            code = CodeCave.Build(original, info, cave, site, out slotOffset);
+            BitConverter.GetBytes(slotValue.Value).CopyTo(code, slotOffset);
+        }
         if (!writer.Write(cave, code)) return "Gagal menulis kode patch ke memori game.";
 
         long rel = (long)cave - (long)(site + 5);
@@ -381,7 +425,7 @@ public partial class PatchItem : ObservableObject
         {
             _caveAddr = cave;
             _slotOffset = slotOffset;
-            _lastSlot = slotValue.Value;
+            _lastSlot = slotStore;
         }
         return "";
     }

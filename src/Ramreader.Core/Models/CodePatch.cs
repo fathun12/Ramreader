@@ -21,8 +21,11 @@ public sealed class CodePatch
 
     public string Note { get; set; } = "";
 
-    /// <summary>Kosong atau "Cave" = hanya karakter pemain yang kebal (bawaan). "Nop" = NOP polos, semua karakter ikut kebal.</summary>
+    /// <summary>Kosong atau "Cave" = hanya karakter pemain yang kebal (bawaan). "Team" = seluruh tim pemain kebal, musuh tidak (dikenali dari penanda di objek). "Nop" = NOP polos, semua karakter ikut kebal.</summary>
     public string Mode { get; set; } = "";
+
+    /// <summary>Mode "Team": offset penanda sisi di dalam objek karakter (hasil halaman Objek Karakter). Nilainya dibaca dari objek pemain saat game berjalan, bukan disimpan.</summary>
+    public int MarkerOffset { get; set; } = 0x44;
     public DateTime CreatedAt { get; set; }
 
     public static string ToHex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));

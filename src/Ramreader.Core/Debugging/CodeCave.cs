@@ -88,5 +88,40 @@ public static class CodeCave
         return code;
     }
 
+    /// <summary>
+    /// Cave "tim": cmp dword [reg+markerOffset], imm32. Kalau sama dengan penanda pemain (satu tim), penulisan dilewati;
+    /// kalau beda (musuh atau objek lain), instruksi asli dijalankan. Imm32 ada di immOffset dan diperbarui Trainer.
+    /// </summary>
+    public static byte[] BuildTeam(byte[] original, CaveInfo info, int markerOffset, uint marker,
+        ulong caveAddress, ulong instructionAddress, out int immOffset)
+    {
+        int n = original.Length;
+        ulong ret = instructionAddress + (ulong)n;
+        int reg = info.BaseReg;
+        var code = new List<byte>(64);
+
+        code.Add(0x9C);                                        // pushfq
+        if (reg >= 8) code.Add(0x41);                          // REX.B
+        code.Add(0x81);                                        // cmp dword [reg+disp32], imm32
+        code.Add((byte)(0xB8 | (reg & 7)));                    // mod=10, /7, rm=reg
+        if ((reg & 7) == 4) code.Add(0x24);                    // SIB untuk rsp/r12
+        code.AddRange(BitConverter.GetBytes(markerOffset));
+        immOffset = code.Count;
+        code.AddRange(BitConverter.GetBytes(marker));
+        code.Add(0x75);                                        // jne -> instruksi asli
+        code.Add(0x06);
+        code.Add(0x9D);                                        // popfq (satu tim: lewati penulisan)
+        int jmp1 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)jmp1 + 5)));
+        code.Add(0x9D);                                        // popfq (bukan satu tim)
+        code.AddRange(original);
+        int jmp2 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)jmp2 + 5)));
+
+        return code.ToArray();
+    }
+
     private static int Rel(ulong target, ulong next) => checked((int)((long)target - (long)next));
 }
