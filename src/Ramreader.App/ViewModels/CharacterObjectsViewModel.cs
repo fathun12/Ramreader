@@ -302,25 +302,31 @@ public partial class CharacterObjectsViewModel : ObservableObject
             return;
         }
 
-        if (!memory.TryRead<uint>(mine.Base + (ulong)markerOffset, out uint myMarker))
+        var myBlock = memory.Read(mine.Base + 0x3CUL, 12);
+        if (myBlock is null)
         {
-            Message = "Penanda milikmu di +0x44 gagal dibaca.";
+            Message = "Penanda milikmu (+0x3C sampai +0x47) gagal dibaca.";
             return;
         }
+        string Triple(byte[] b) => $"{BitConverter.ToUInt32(b, 0):X8} {BitConverter.ToUInt32(b, 4):X8} {BitConverter.ToUInt32(b, 8):X8}";
+        var others = new List<string>();
 
         int team = 1, enemy = 0, unread = 0;
         var enemyValues = new SortedSet<uint>();
         foreach (var row in Objects)
         {
             if (row.IsMine) continue;
-            if (!memory.TryRead<uint>(row.Base + (ulong)markerOffset, out uint value)) { unread++; continue; }
+            var block = memory.Read(row.Base + 0x3CUL, 12);
+            if (block is null) { unread++; continue; }
+            uint value = BitConverter.ToUInt32(block, 8);
+            others.Add($"0x{row.Base:X}: {Triple(block)}");
 
-            if (value == myMarker) { row.Role = "Tim"; team++; }
+            if (block.AsSpan().SequenceEqual(myBlock)) { row.Role = "Tim"; team++; }
             else { row.Role = "Musuh"; enemy++; enemyValues.Add(value); }
         }
 
-        Message = $"Otomatis: {team} Tim, {enemy} Musuh (penanda +0x{markerOffset:X} milikmu 0x{myMarker:X8}). " +
-                  "Nilai penanda Musuh: " + (enemyValues.Count == 0 ? "-" : string.Join(", ", enemyValues.Select(v => $"0x{v:X8}"))) +
+        Message = $"Otomatis: {team} Tim, {enemy} Musuh. Penanda 12 byte (+0x3C +0x40 +0x44) milikmu: {Triple(myBlock)}. " +
+                  "Objek lain: " + (others.Count == 0 ? "-" : string.Join(" | ", others)) +
                   (unread > 0 ? $". {unread} objek gagal dibaca." : ".");
     }
 

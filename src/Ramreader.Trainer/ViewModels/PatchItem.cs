@@ -26,6 +26,7 @@ public partial class PatchItem : ObservableObject
     private ulong? _address;
     private ulong _caveAddr;
     private int _slotOffset;
+    private int _dataOffset;
     private ulong _lastSlot;
     private int _pid;
     private int _searchedPid;
@@ -165,6 +166,30 @@ public partial class PatchItem : ObservableObject
         return memory.TryRead<uint>(at, out var value) && value != 0 ? (uint?)value : null;
     }
 
+    /// <summary>Diagnostik mode tim: berapa kali cave melewati penulisan (dianggap satu tim) dan menjalankannya (dianggap musuh).</summary>
+    private string Diagnostic(ProcessMemory memory)
+    {
+        ulong cave;
+        int data;
+        lock (_lock) { cave = _caveAddr; data = _dataOffset; }
+        if (cave == 0 || data == 0) return "";
+
+        var bytes = memory.Read(cave + (ulong)data, 24);
+        if (bytes is null) return " | Diagnostik: belum terbaca";
+
+        uint skip = BitConverter.ToUInt32(bytes, 0);
+        uint run = BitConverter.ToUInt32(bytes, 4);
+        ulong lastSkip = BitConverter.ToUInt64(bytes, 8);
+        ulong lastRun = BitConverter.ToUInt64(bytes, 16);
+
+        string MarkerOf(ulong obj) =>
+            obj != 0 && memory.TryRead<uint>(obj + (ulong)(long)_patch.MarkerOffset, out uint m) ? $"0x{m:X8}" : "-";
+
+        return $" | Diagnostik: dilewati {skip}x, dijalankan {run}x. " +
+               $"Objek terakhir dilewati 0x{lastSkip:X} (penanda {MarkerOf(lastSkip)}), " +
+               $"objek terakhir dijalankan 0x{lastRun:X} (penanda {MarkerOf(lastRun)}).";
+    }
+
     // ---------- membaca (timer 1 detik) ----------
 
     public void Update(ProcessMemory? memory)
@@ -220,7 +245,7 @@ public partial class PatchItem : ObservableObject
                 _active = true;
                 StatusText = IsTeam
                     ? "Patch aktif (mode tim): seluruh timmu tidak berkurang, musuh tetap. Penanda pemain: " +
-                      (ComputeMarker(memory) is { } pm ? $"0x{pm:X8}" : "belum terbaca")
+                      (ComputeMarker(memory) is { } pm ? $"0x{pm:X8}" : "belum terbaca") + Diagnostic(memory)
                     : _playerOnly
                         ? "Patch aktif: hanya karakter pemain yang tidak berkurang."
                         : "Patch aktif (NOP polos): semua karakter ikut tidak berkurang.";
@@ -403,7 +428,8 @@ public partial class PatchItem : ObservableObject
             if (marker is null)
                 return "Penanda tim milik pemain belum terbaca (objek pemain belum siap). Masuk ke match, gerakkan karakter, lalu nyalakan lagi.";
 
-            code = CodeCave.BuildTeam(original, info, _patch.MarkerOffset, marker.Value, cave, site, out slotOffset);
+            code = CodeCave.BuildTeamDiag(original, info, _patch.MarkerOffset, marker.Value, cave, site, out slotOffset, out int dataOff);
+            lock (_lock) _dataOffset = dataOff;
             slotStore = marker.Value;
         }
         else
