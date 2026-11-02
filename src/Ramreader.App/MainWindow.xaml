@@ -61,6 +61,13 @@
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
+                <ui:NavigationViewItem Content="Objek Karakter"
+                                       TargetPageType="{x:Type views:CharacterObjectsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="People24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
                 <ui:NavigationViewItem Content="Tersimpan"
                                        TargetPageType="{x:Type views:SavedPage}">
                     <ui:NavigationViewItem.Icon>
