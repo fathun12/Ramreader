@@ -435,6 +435,10 @@ public partial class CharacterObjectsViewModel : ObservableObject
 
         foreach (var row in Objects)
             row.ValueText = ReadValue(memory, row.Base);
+
+        // Otomatis: begitu baris Tim (aku) ada, objek yang masih "?" langsung ditandai lewat +0x44.
+        if (Objects.Any(o => o.IsMine) && Objects.Any(o => !o.IsMine && o.Role == "?"))
+            AutoMark();
     }
 
     private string ReadValue(Ramreader.Core.Memory.ProcessMemory memory, ulong baseAddress)
