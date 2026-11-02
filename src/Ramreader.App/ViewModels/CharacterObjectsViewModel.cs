@@ -72,6 +72,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
     private int _rounds;
     private ObjectTracer? _tracer;
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _scanCts;
     private ulong? _playerBase;
     private long _disp;
     private ScanValueType _valueType = ScanValueType.Float;
@@ -93,6 +94,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private string _candidateSummary = "";
     [ObservableProperty] private bool _isTracing;
+    [ObservableProperty] private bool _isScanning;
 
     public bool HasMessage => !string.IsNullOrEmpty(Message);
     public bool NotConnected => !Session.IsConnected;
@@ -116,6 +118,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
     }
 
     partial void OnIsTracingChanged(bool value) => UpdateStates();
+    partial void OnIsScanningChanged(bool value) => UpdateStates();
     partial void OnSelectedSavedChanged(SavedItem? value)
     {
         InstructionText = "";
@@ -148,7 +151,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
     }
 
     private bool CanStart() => Session.IsConnected && !IsTracing && SelectedSaved is not null;
-    private bool CanStop() => IsTracing;
+    private bool CanStop() => IsTracing || IsScanning;
 
     private static bool TryParseOffset(string text, out ulong offset)
     {
@@ -264,7 +267,7 @@ public partial class CharacterObjectsViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanStop))]
-    private void Stop() => _cts?.Cancel();
+    private void Stop() { _cts?.Cancel(); _scanCts?.Cancel(); }
 
     [RelayCommand]
     private void MarkTeam()
@@ -396,6 +399,73 @@ public partial class CharacterObjectsViewModel : ObservableObject
         Message = "Irisan dikosongkan. Tanda Tim/Musuh tetap ada. Klik Bandingkan untuk mulai ronde 1 lagi.";
     }
 
+    private bool CanFindHolders() => Session.IsConnected && !IsScanning;
+
+    [RelayCommand(CanExecute = nameof(CanFindHolders))]
+    private async Task FindHoldersAsync()
+    {
+        var memory = Session.Memory;
+        if (memory is null) return;
+
+        var targets = new List<ReverseTarget>();
+        int t = 0, m = 0;
+        foreach (var row in Objects)
+        {
+            if (row.IsMine) targets.Add(new ReverseTarget(row.Base, "A", false));
+            else if (row.IsTeam) targets.Add(new ReverseTarget(row.Base, "T" + (++t), false));
+            else if (row.IsEnemy) targets.Add(new ReverseTarget(row.Base, "M" + (++m), true));
+        }
+
+        if (!targets.Any(x => !x.IsEnemy) || !targets.Any(x => x.IsEnemy))
+        {
+            Message = "Tandai minimal satu Tim dan satu Musuh dulu. Di mirror semua otomatis Tim: pilih baris musuh lalu klik Tandai Musuh.";
+            return;
+        }
+
+        IsScanning = true;
+        _scanCts = new CancellationTokenSource();
+        var token = _scanCts.Token;
+        var progress = new Progress<double>(p => Summary = $"Memindai memori... {p:P0}");
+        Message = "Memindai seluruh memori game untuk penunjuk ke objek karakter (bisa puluhan detik). Berhenti = batal.";
+
+        string report;
+        try
+        {
+            report = await Task.Run(() =>
+            {
+                var hits = ReversePointerFinder.Scan(memory, targets, progress, token);
+                return ReversePointerFinder.Report(hits, targets);
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            Message = "Pemindaian dibatalkan.";
+            return;
+        }
+        catch (Exception ex)
+        {
+            Message = "Pemindaian gagal: " + ex.Message;
+            return;
+        }
+        finally
+        {
+            _scanCts?.Dispose();
+            _scanCts = null;
+            IsScanning = false;
+        }
+
+        Summary = "Pemindaian selesai.";
+        try
+        {
+            System.Windows.Clipboard.SetText(report);
+            Message = "Selesai. Laporan disalin ke clipboard: tempel (Ctrl+V) ke chat.";
+        }
+        catch (Exception ex)
+        {
+            Message = "Selesai, tapi gagal menyalin ke clipboard: " + ex.Message;
+        }
+    }
+
     private void ShowCandidates(int teamCount, int enemyCount, int skipped)
     {
         Candidates.Clear();
@@ -464,5 +534,6 @@ public partial class CharacterObjectsViewModel : ObservableObject
     {
         StartCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
+        FindHoldersCommand.NotifyCanExecuteChanged();
     }
 }

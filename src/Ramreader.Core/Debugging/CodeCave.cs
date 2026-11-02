@@ -272,5 +272,80 @@ public static class CodeCave
         return bytes;
     }
 
+    /// <summary>
+    /// Cave "pohon": register basis dibandingkan dengan slotCount slot (8 byte). Sama dengan salah satu = satu sisi dengan pemain
+    /// (penulisan dilewati); tidak ada yang sama = musuh (instruksi asli jalan). Slot di slotsOffset (diisi pemanggil).
+    /// Blok data (24 byte) di dataOffset: +0 dilewati, +4 dijalankan, +8 objek terakhir dilewati, +16 objek terakhir dijalankan.
+    /// </summary>
+    public static byte[] BuildTreeDiag(byte[] original, CaveInfo info, int slotCount,
+        ulong caveAddress, ulong instructionAddress, out int slotsOffset, out int dataOffset)
+    {
+        int n = original.Length;
+        ulong ret = instructionAddress + (ulong)n;
+        int reg = info.BaseReg;
+        var code = new List<byte>(256);
+        var fixups = new List<(int Pos, bool IsSlot, int Index)>();
+        var jes = new List<int>();
+
+        void RipRef(bool isSlot, int index)
+        {
+            fixups.Add((code.Count, isSlot, index));
+            code.AddRange(new byte[4]);
+        }
+
+        code.Add(0x9C);                                        // pushfq
+        for (int i = 0; i < slotCount; i++)
+        {
+            code.Add((byte)(0x48 | (reg >= 8 ? 4 : 0)));       // cmp reg,[rip+slot_i]
+            code.Add(0x3B);
+            code.Add((byte)(0x05 | ((reg & 7) << 3)));
+            RipRef(true, i);
+            code.Add(0x0F);                                    // je skip (rel32)
+            code.Add(0x84);
+            jes.Add(code.Count);
+            code.AddRange(new byte[4]);
+        }
+
+        code.Add(0xFF);                                        // dijalankan++
+        code.Add(0x05);
+        RipRef(false, 4);
+        code.Add((byte)(0x48 | (reg >= 8 ? 4 : 0)));           // objek terakhir dijalankan
+        code.Add(0x89);
+        code.Add((byte)(0x05 | ((reg & 7) << 3)));
+        RipRef(false, 16);
+        code.Add(0x9D);                                        // popfq
+        code.AddRange(original);
+        int j2 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)j2 + 5)));
+
+        int skipStart = code.Count;
+        code.Add(0xFF);                                        // dilewati++
+        code.Add(0x05);
+        RipRef(false, 0);
+        code.Add((byte)(0x48 | (reg >= 8 ? 4 : 0)));           // objek terakhir dilewati
+        code.Add(0x89);
+        code.Add((byte)(0x05 | ((reg & 7) << 3)));
+        RipRef(false, 8);
+        code.Add(0x9D);                                        // popfq
+        int j1 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)j1 + 5)));
+
+        slotsOffset = (code.Count + 7) & ~7;
+        dataOffset = slotsOffset + slotCount * 8;
+        while (code.Count < dataOffset + 24) code.Add(0);
+
+        var bytes = code.ToArray();
+        foreach (int at in jes)
+            BitConverter.GetBytes(skipStart - (at + 4)).CopyTo(bytes, at);
+        foreach (var (pos, isSlot, index) in fixups)
+        {
+            int target = isSlot ? slotsOffset + index * 8 : dataOffset + index;
+            BitConverter.GetBytes(target - (pos + 4)).CopyTo(bytes, pos);
+        }
+        return bytes;
+    }
+
     private static int Rel(ulong target, ulong next) => checked((int)((long)target - (long)next));
 }

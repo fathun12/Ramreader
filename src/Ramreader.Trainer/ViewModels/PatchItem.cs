@@ -29,6 +29,7 @@ public partial class PatchItem : ObservableObject
     private int _dataOffset;
     private int[] _immOffsets = Array.Empty<int>();
     private uint[]? _lastMarkers;
+    private ulong[]? _lastTree;
 
     // Penanda sisi = 3 dword berurutan di objek karakter. Satu dword saja bisa kebetulan sama antar sisi.
     private const int MarkerStart = 0x3C;
@@ -69,8 +70,11 @@ public partial class PatchItem : ObservableObject
     public string Title => string.IsNullOrWhiteSpace(_patch.Label) ? "God Mode" : _patch.Label;
 
     private bool IsTeam => string.Equals(_patch.Mode, "Team", StringComparison.OrdinalIgnoreCase);
+    private bool IsTree => string.Equals(_patch.Mode, "Tree", StringComparison.OrdinalIgnoreCase);
 
-    public string Detail => IsTeam
+    public string Detail => IsTree
+        ? $"Seluruh sisimu kebal (dikenali dari pohon penghubung karakter di memori, aman untuk karakter kembar); musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
+        : IsTeam
         ? $"Seluruh timmu kebal (dikenali dari penanda di objek); musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
         : _playerOnly
         ? $"Hanya karakter pemain yang kebal; musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
@@ -147,6 +151,23 @@ public partial class PatchItem : ObservableObject
             return;
         }
 
+        if (IsTree)
+        {
+            var tree = ComputeTreeSlots(memory);
+            if (tree is null) return;
+
+            ulong[]? prevTree;
+            lock (_lock) prevTree = _lastTree;
+            if (prevTree is not null && prevTree.AsSpan().SequenceEqual(tree)) return;
+
+            var buf = new byte[tree.Length * 8];
+            for (int i = 0; i < tree.Length; i++)
+                BitConverter.GetBytes(tree[i]).CopyTo(buf, i * 8);
+            if (writer.Write(cave + (ulong)slotOffset, buf))
+                lock (_lock) _lastTree = tree;
+            return;
+        }
+
         var slot = ComputeSlot(memory);
         if (slot is null || slot.Value == last) return;
 
@@ -180,6 +201,23 @@ public partial class PatchItem : ObservableObject
         var result = new uint[MarkerWords];
         for (int i = 0; i < MarkerWords; i++) result[i] = BitConverter.ToUInt32(bytes, i * 4);
         return result.All(v => v == 0) ? null : result;
+    }
+
+    /// <summary>Mode "Tree": seluruh sisi pemain = simpul yang tersambung dari objek pemain. Hasil: nilai register basis tiap karakter (awal simpul + 0x28), sisanya nol.</summary>
+    private ulong[]? ComputeTreeSlots(ProcessMemory memory)
+    {
+        var playerBase = ComputeSlot(memory);
+        if (playerBase is null || playerBase.Value < SideTree.BaseFromNode) return null;
+
+        var nodes = SideTree.Collect(memory, playerBase.Value - SideTree.BaseFromNode, SideTree.MaxNodes);
+        if (nodes is null) return null;
+
+        var slots = new ulong[SideTree.MaxNodes];
+        int count = Math.Min(nodes.Count, slots.Length);
+        for (int i = 0; i < count; i++)
+            slots[i] = nodes[i] + SideTree.BaseFromNode;
+        if (count > 2) Array.Sort(slots, 1, count - 1);
+        return slots;
     }
 
     /// <summary>Diagnostik mode tim: berapa kali cave melewati penulisan (dianggap satu tim) dan menjalankannya (dianggap musuh).</summary>
@@ -262,7 +300,9 @@ public partial class PatchItem : ObservableObject
                 break;
             case PatchState.Patched:
                 _active = true;
-                StatusText = IsTeam
+                StatusText = IsTree
+                    ? "Patch aktif (mode pohon): seluruh sisimu tidak berkurang, musuh tetap." + Diagnostic(memory)
+                    : IsTeam
                     ? "Patch aktif (mode tim): seluruh timmu tidak berkurang, musuh tetap. Penanda pemain: " +
                       (ComputeMarkers(memory) is { } pm ? string.Join(" ", pm.Select(v => v.ToString("X8"))) : "belum terbaca") + Diagnostic(memory)
                     : _playerOnly
@@ -442,6 +482,7 @@ public partial class PatchItem : ObservableObject
         int slotOffset;
         ulong slotStore = slotValue.Value;
         uint[]? teamMarkers = null;
+        ulong[]? treeStore = null;
         int[] immOffsets = Array.Empty<int>();
         if (IsTeam)
         {
@@ -455,7 +496,22 @@ public partial class PatchItem : ObservableObject
         }
         else
         {
-            code = CodeCave.Build(original, info, cave, site, out slotOffset);
+            if (IsTree)
+            {
+                var tree = ComputeTreeSlots(memory);
+                if (tree is null)
+                    return "Pohon sisi milik pemain belum terbaca (objek pemain belum siap). Masuk ke match, gerakkan karakter, lalu nyalakan lagi.";
+
+                code = CodeCave.BuildTreeDiag(original, info, SideTree.MaxNodes, cave, site, out slotOffset, out int treeData);
+                for (int i = 0; i < tree.Length; i++)
+                    BitConverter.GetBytes(tree[i]).CopyTo(code, slotOffset + i * 8);
+                lock (_lock) _dataOffset = treeData;
+                treeStore = tree;
+            }
+            else
+            {
+                code = CodeCave.Build(original, info, cave, site, out slotOffset);
+            }
             BitConverter.GetBytes(slotValue.Value).CopyTo(code, slotOffset);
         }
         if (!writer.Write(cave, code)) return "Gagal menulis kode patch ke memori game.";
@@ -475,6 +531,7 @@ public partial class PatchItem : ObservableObject
             _lastSlot = slotStore;
             _immOffsets = immOffsets;
             _lastMarkers = teamMarkers;
+            _lastTree = treeStore;
         }
         return "";
     }

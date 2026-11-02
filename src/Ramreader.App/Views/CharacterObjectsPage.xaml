@@ -84,6 +84,8 @@
                                    Command="{Binding CompareCommand}" />
                         <ui:Button Content="Ulangi Irisan" Margin="0,0,8,6"
                                    Command="{Binding ResetRoundsCommand}" />
+                        <ui:Button Content="Cari Penampung" Margin="0,0,8,6" Appearance="Primary"
+                                   Command="{Binding FindHoldersCommand}" />
                     </WrapPanel>
 
                     <TextBlock Text="{Binding Hint}" Margin="0,2,0,0" Style="{StaticResource MutedText}" />
