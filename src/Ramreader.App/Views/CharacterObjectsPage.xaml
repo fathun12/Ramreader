@@ -76,6 +76,8 @@
                                    Command="{Binding MarkEnemyCommand}" />
                         <ui:Button Content="Sisanya Musuh" Margin="0,0,8,6"
                                    Command="{Binding MarkRestEnemyCommand}" />
+                        <ui:Button Content="Tandai Otomatis" Margin="0,0,8,6" Appearance="Primary"
+                                   Command="{Binding AutoMarkCommand}" />
                         <ui:Button Content="Hapus Tanda" Margin="0,0,8,6"
                                    Command="{Binding ClearMarksCommand}" />
                         <ui:Button Content="Bandingkan" Margin="0,0,8,6" Appearance="Primary"

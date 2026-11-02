@@ -263,6 +263,43 @@ public partial class CharacterObjectsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void AutoMark()
+    {
+        const int markerOffset = 0x44;
+
+        var memory = Session.Memory;
+        if (memory is null) return;
+
+        var mine = Objects.FirstOrDefault(o => o.IsMine);
+        if (mine is null)
+        {
+            Message = "Baris Tim (aku) belum ada. Pilih alamat tersimpan dan instruksi yang cocok, lalu Mulai Pantau dan pakai karakter sampai barisnya muncul.";
+            return;
+        }
+
+        if (!memory.TryRead<uint>(mine.Base + (ulong)markerOffset, out uint myMarker))
+        {
+            Message = "Penanda milikmu di +0x44 gagal dibaca.";
+            return;
+        }
+
+        int team = 1, enemy = 0, unread = 0;
+        var enemyValues = new SortedSet<uint>();
+        foreach (var row in Objects)
+        {
+            if (row.IsMine) continue;
+            if (!memory.TryRead<uint>(row.Base + (ulong)markerOffset, out uint value)) { unread++; continue; }
+
+            if (value == myMarker) { row.Role = "Tim"; team++; }
+            else { row.Role = "Musuh"; enemy++; enemyValues.Add(value); }
+        }
+
+        Message = $"Otomatis: {team} Tim, {enemy} Musuh (penanda +0x{markerOffset:X} milikmu 0x{myMarker:X8}). " +
+                  "Nilai penanda Musuh: " + (enemyValues.Count == 0 ? "-" : string.Join(", ", enemyValues.Select(v => $"0x{v:X8}"))) +
+                  (unread > 0 ? $". {unread} objek gagal dibaca." : ".");
+    }
+
+    [RelayCommand]
     private void ClearMarks()
     {
         foreach (var row in Objects)
