@@ -77,6 +77,24 @@ User berbahasa Indonesia, santai. Kalau ia menulis huruf kapital semua, itu tand
 
 25. **Setiap fitur penanda sisi harus dites di minimal 3 kondisi berbeda (match sekarang, rematch, ganti karakter lalu match baru) sebelum dicatat terbukti.** Tes satu sesi tidak cukup: nilai +0x44 sudah terbukti berubah antar sesi dan pernah dalam satu proses. Jangan menyuruh user menguji hanya satu sesi lalu menyimpulkan.
 
+## 2b. Catatan serah terima 2 Nov 2026 (Langkah 9E, baca ini dulu)
+
+**Terbukti (dilaporkan user dengan screenshot):**
+- Pemindai Objek Karakter bekerja di instruksi apa pun yang menulis [reg+offset], bukan hanya chakra. HP = +94BAE2 (movss [rcx+10h], byte F3 0F 11 41 10). Kolom Instruksi harus berisi instruksi yang cocok dengan alamat tersimpan; bawaan lama 94BC94 (chakra) membuat HP seolah gagal. Kolom kini otomatis dari CodePatches bila dikosongkan (kode terpasang).
+- Objek tertangkap hanya bila instruksi dipantau jalan: tiap karakter harus kena hit dulu.
+- Penanda sisi = TIGA dword berurutan di objek karakter: +0x3C, +0x40, +0x44. Satu dword saja tidak cukup: di sesi PID 27268 +0x44 sama untuk kedua sisi sehingga musuh dikira tim. Offset yang membedakan berbeda antar sesi. Nilainya berganti antar sesi dan berasal dari kumpulan kecil, jadi JANGAN disimpan di profil; Trainer membacanya dari objek pemain tiap tick.
+- Tombol Tandai Otomatis (Objek Karakter) menandai Tim/Musuh dengan membandingkan 12 byte itu dengan objek "Tim (aku)". Jangan menyebut tanda manual user "tidak terverifikasi"; user tersinggung dan Tandai Otomatis sudah menjawabnya.
+- CodeCave Mode Team (CodeCave.BuildTeamDiagMulti, PatchItem.ComputeMarkers, Mode "Team" di JSON sesi) melindungi seluruh tim DAN musuh tetap kena damage, untuk God Mode (HP). Dites user di 3 kondisi (sesi sama, rematch, karakter baru): stabil. Diagnostik di kartu: dilewati 90x, dijalankan 52x.
+
+**Belum dikerjakan / belum terbukti:**
+- Unlimited Chakra (+94BC94) dan Team Tag (+94BB7A, gauge) masih mode pemain-saja. Mode Team untuk chakra belum dicoba (ubah Mode lewat penggantian teks di JSON, lihat aturan 23). Team Tag belum dicari penandanya.
+- MASALAH BARU (laporan user): Mode Team TIDAK berlaku untuk karakter COM. Belum jelas maksudnya (teman COM satu tim tidak kebal, atau musuh COM). Dugaan belum terbukti: (1) COM menulis HP lewat instruksi lain, (2) instruksi sama tapi penanda objek COM beda. Tes tanpa build: God Mode nyala, COM satu tim dipukul, lihat hitungan "dilewati" di kartu; naik = dugaan 2, tidak naik = dugaan 1 (lalu cari instruksi penulis HP COM lewat Cari Nilai, Jalur Stabil, Penulis Kode; JANGAN menyuruh user membuka Cheat Engine).
+- Tombol Ulangi Irisan: user melaporkan "tidak bisa direset"; penyebab di kode tidak ditemukan (logika benar). Usulan pesan konfirmasi di kotak Info mungkin belum dipasang.
+- Dugaan: menutup Ramreader paksa saat Mulai Pantau menyebabkan game crash (breakpoint DR0 tertinggal). Suruh user klik Berhenti dulu. Menutup Trainer paksa saat patch menyala meninggalkan lompatan ke cave lama; matikan toggle dulu.
+- Kode Mode Team dan Tandai Otomatis mungkin belum di-commit; cek git status.
+
+**Preferensi user (kasar bila kesal, tapi alasannya sah):** jawaban pendek, hasil dulu; selalu beri perintah build+buka Ramreader dan Trainer sekaligus (aturan 22); user sedang menghemat token; user tidak mau membaca memori sendiri atau membuka CE; otomatiskan semua yang bisa; jangan mengajukan dugaan sebagai kepastian.
+
 ## 3. Lingkungan user
 
 - Windows 11, VS Code, terminal **PowerShell 5.1**, root `D:\Projects\Ramreader`.
