@@ -4,7 +4,7 @@ using Decoder = Iced.Intel.Decoder;
 namespace Ramreader.Core.Debugging;
 
 /// <summary>Hasil analisis instruksi penulis: register basis dan displacement alamat tulisnya (mis. [rcx+10h]).</summary>
-public sealed record CaveInfo(int BaseReg, long Disp, int Length);
+public sealed record CaveInfo(int BaseReg, long Disp, int Length, int WriterLength = 0, int IndexReg = -1, int Scale = 1);
 
 /// <summary>
 /// Code cave "pemain saja": instruksi penulis diganti jmp ke cave. Di cave, kalau register basis sama dengan
@@ -28,7 +28,7 @@ public static class CodeCave
         decoder.IP = 0x1000;
         var ins = decoder.Decode();
 
-        if (ins.IsInvalid || ins.Length != original.Length)
+        if (ins.IsInvalid || ins.Length > original.Length)
         {
             error = "Byte patch bukan satu instruksi utuh.";
             return false;
@@ -43,7 +43,7 @@ public static class CodeCave
             error = "Instruksi memakai alamat relatif RIP.";
             return false;
         }
-        if (ins.MemoryIndex != Register.None)
+        if (ins.MemoryIndex != Register.None && (ins.MemoryIndex < Register.RAX || ins.MemoryIndex > Register.R15 || ins.MemoryIndex == Register.RSP || ins.MemoryBase == Register.RSP))
         {
             error = "Instruksi memakai register indeks.";
             return false;
@@ -56,7 +56,28 @@ public static class CodeCave
             return false;
         }
 
-        info = new CaveInfo(b - Register.RAX, unchecked((long)ins.MemoryDisplacement64), original.Length);
+        int writerLength = ins.Length;
+        int pos = writerLength;
+        while (pos < original.Length)
+        {
+            var next = decoder.Decode();
+            bool last = pos + next.Length == original.Length;
+            if (next.IsInvalid || pos + next.Length > original.Length)
+            {
+                error = "Byte patch memuat potongan instruksi sesudah penulis.";
+                return false;
+            }
+            if (next.IsIPRelativeMemoryOperand ||
+                !(next.FlowControl == FlowControl.Next || (last && next.FlowControl == FlowControl.Return)))
+            {
+                error = "Instruksi sesudah penulis (digabung karena penulisnya kurang dari 5 byte) cabang/call atau memakai alamat relatif RIP, tidak bisa disalin ke cave.";
+                return false;
+            }
+            pos += next.Length;
+        }
+
+        info = new CaveInfo(b - Register.RAX, unchecked((long)ins.MemoryDisplacement64), original.Length, writerLength,
+            ins.MemoryIndex == Register.None ? -1 : ins.MemoryIndex - Register.RAX, ins.MemoryIndexScale);
         return true;
     }
 
@@ -65,6 +86,7 @@ public static class CodeCave
     {
         int n = original.Length;
         ulong ret = instructionAddress + (ulong)n;
+        if (info.IndexReg >= 0) return BuildIndexed(original, info, caveAddress, instructionAddress, out slotOffset);
         slotOffset = (22 + n + 7) & ~7;
 
         var code = new byte[slotOffset + 8];
@@ -347,5 +369,76 @@ public static class CodeCave
         return bytes;
     }
 
+    /// <summary>Offset di cave tempat "ekor" ditaruh bila penulis kurang dari 5 byte (cave 0x1000 byte, blok utama jauh lebih kecil).</summary>
+    public const int TailOffset = 0x800;
+
+    /// <summary>
+    /// Ekor cave untuk patch gabungan: salinan instruksi sesudah penulis (ikut tertimpa lompatan 5 byte),
+    /// lalu lompat ke game sesudah semuanya (kecuali ekornya berakhir ret).
+    /// </summary>
+    public static byte[] BuildTail(byte[] original, CaveInfo info, ulong tailAddress, ulong instructionAddress)
+    {
+        var tail = original[info.WriterLength..];
+        var decoder = Decoder.Create(64, new ByteArrayCodeReader(tail));
+        decoder.IP = 0x1000;
+        bool endsWithRet = false;
+        int pos = 0;
+        while (pos < tail.Length)
+        {
+            var ins = decoder.Decode();
+            if (ins.IsInvalid) break;
+            endsWithRet = ins.FlowControl == FlowControl.Return;
+            pos += ins.Length;
+        }
+
+        var code = new List<byte>(tail);
+        if (!endsWithRet)
+        {
+            int at = code.Count;
+            code.Add(0xE9);
+            code.AddRange(BitConverter.GetBytes(Rel(instructionAddress + (ulong)original.Length, tailAddress + (ulong)at + 5)));
+        }
+        return code.ToArray();
+    }
+
     private static int Rel(ulong target, ulong next) => checked((int)((long)target - (long)next));
+
+    /// <summary>Cave pemain-saja untuk alamat tulis berindeks [base+index*scale+disp]: bandingkan base+index*scale (lewat r11) dengan slot.</summary>
+    private static byte[] BuildIndexed(byte[] original, CaveInfo info, ulong caveAddress, ulong instructionAddress, out int slotOffset)
+    {
+        int n = original.Length;
+        ulong ret = instructionAddress + (ulong)n;
+        int bas = info.BaseReg, idx = info.IndexReg;
+        int scaleBits = info.Scale switch { 2 => 1, 4 => 2, 8 => 3, _ => 0 };
+        var code = new List<byte>(64);
+
+        code.Add(0x9C);                                        // pushfq
+        code.Add(0x41); code.Add(0x53);                        // push r11
+        code.Add((byte)(0x4C | (idx >= 8 ? 2 : 0) | (bas >= 8 ? 1 : 0)));
+        code.Add(0x8D);                                        // lea r11,[base+index*scale]
+        bool disp8 = (bas & 7) == 5;
+        code.Add((byte)(disp8 ? 0x5C : 0x1C));
+        code.Add((byte)((scaleBits << 6) | ((idx & 7) << 3) | (bas & 7)));
+        if (disp8) code.Add(0);
+        code.Add(0x4C); code.Add(0x3B); code.Add(0x1D);        // cmp r11,[rip+slot]
+        int fix = code.Count;
+        code.AddRange(new byte[4]);
+        code.Add(0x41); code.Add(0x5B);                        // pop r11 (flag tidak berubah)
+        code.Add(0x75); code.Add(0x06);                        // jne -> instruksi asli
+        code.Add(0x9D);                                        // popfq (pemain: lewati penulisan)
+        int j1 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)j1 + 5)));
+        code.Add(0x9D);                                        // popfq (bukan pemain)
+        code.AddRange(original);
+        int j2 = code.Count;
+        code.Add(0xE9);
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)j2 + 5)));
+
+        slotOffset = (code.Count + 7) & ~7;
+        while (code.Count < slotOffset + 8) code.Add(0);
+        var bytes = code.ToArray();
+        BitConverter.GetBytes(slotOffset - (fix + 4)).CopyTo(bytes, fix);
+        return bytes;
+    }
 }

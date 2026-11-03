@@ -26,6 +26,8 @@ public sealed class CodePatch
 
     /// <summary>Mode "Team": offset penanda sisi di dalam objek karakter (hasil halaman Objek Karakter). Nilainya dibaca dari objek pemain saat game berjalan, bukan disimpan.</summary>
     public int MarkerOffset { get; set; } = 0x44;
+    /// <summary>Patch dengan Group sama (tidak kosong) dinyalakan/dimatikan bersama di Trainer.</summary>
+    public string Group { get; set; } = "";
     public DateTime CreatedAt { get; set; }
 
     public static string ToHex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));

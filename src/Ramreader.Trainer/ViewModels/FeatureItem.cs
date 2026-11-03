@@ -112,7 +112,8 @@ public partial class FeatureItem : ObservableObject
         Max = MaxText,
         Preset = PresetText,
         HotkeySet = HotkeySetText,
-        HotkeyFreeze = HotkeyFreezeText
+        HotkeyFreeze = HotkeyFreezeText,
+        AutoFreeze = AutoFreeze
     };
 
     public void ApplySettings(FeatureSettings s)
@@ -126,6 +127,7 @@ public partial class FeatureItem : ObservableObject
             PresetText = s.Preset ?? "";
             HotkeySetText = s.HotkeySet ?? "";
             HotkeyFreezeText = s.HotkeyFreeze ?? "";
+            AutoFreeze = s.AutoFreeze;
         }
         finally
         {
@@ -167,6 +169,7 @@ public partial class FeatureItem : ObservableObject
 
     public void Update(ProcessMemory? memory)
     {
+        TryAutoFreeze(memory);
         CurrentAddress = null;
         _lastRaw = null;
 
@@ -230,6 +233,20 @@ public partial class FeatureItem : ObservableObject
     }
 
     public void HotkeyToggleFreeze() => IsFrozen = !IsFrozen;
+
+    /// <summary>Kunci otomatis di nilai Preset begitu nilai terbaca (sekali per proses game; kalau dilepas manual, tidak dikunci lagi).</summary>
+    public bool AutoFreeze { get; set; }
+    private int _autoPid;
+
+    private void TryAutoFreeze(ProcessMemory? memory)
+    {
+        if (!AutoFreeze || memory is null || IsFrozen || _autoPid == memory.ProcessId) return;
+        if (_lastRaw is null || string.IsNullOrWhiteSpace(PresetText)) return;
+
+        _autoPid = memory.ProcessId;
+        InputText = PresetText;
+        IsFrozen = true;
+    }
 
     private string SetFromText(string text) =>
         ValueCodec.TryParse(Saved.ValueType, text, out ulong raw)

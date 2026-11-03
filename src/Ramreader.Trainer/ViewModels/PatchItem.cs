@@ -22,6 +22,11 @@ public partial class PatchItem : ObservableObject
     private readonly bool _playerOnly;
     private readonly CaveInfo? _cave;
     private readonly string _caveError = "";
+    private static readonly List<WeakReference<PatchItem>> Registry = new();
+    private static bool _propagating;
+    private volatile bool _retired;
+    private string _errorText = "";
+    private DateTime _errorUntil = DateTime.MinValue;
 
     private ulong? _address;
     private ulong _caveAddr;
@@ -48,6 +53,7 @@ public partial class PatchItem : ObservableObject
         _patch = patch;
         _owner = owner;
         _session = session;
+        lock (Registry) Registry.Add(new WeakReference<PatchItem>(this));
 
         foreach (var line in owner.Chains)
         {
@@ -295,7 +301,7 @@ public partial class PatchItem : ObservableObject
         {
             case PatchState.Original:
                 _active = false;
-                StatusText = "Siap. Patch belum aktif.";
+                StatusText = DateTime.UtcNow < _errorUntil ? _errorText : "Siap. Patch belum aktif.";
                 SetOn(false);
                 break;
             case PatchState.Patched:
@@ -394,15 +400,42 @@ public partial class PatchItem : ObservableObject
             StatusText = value
                 ? (_playerOnly ? "Patch aktif: hanya karakter pemain yang tidak berkurang." : "Patch aktif (NOP polos).")
                 : "Patch dimatikan.";
+            PropagateToGroup(value);
             return;
         }
 
         StatusText = error;
+        _errorText = error;
+        _errorUntil = DateTime.UtcNow.AddSeconds(20);
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
         {
             SetOn(!value);
             StatusText = error;
         }));
+    }
+
+    /// <summary>Patch dengan Group sama dinyalakan/dimatikan bersama (satu tombol untuk beberapa patch).</summary>
+    private void PropagateToGroup(bool value)
+    {
+        string group = _patch.Group ?? "";
+        if (_propagating || group.Length == 0) return;
+
+        var peers = new List<PatchItem>();
+        lock (Registry)
+        {
+            Registry.RemoveAll(r => !r.TryGetTarget(out _));
+            foreach (var r in Registry)
+            {
+                if (r.TryGetTarget(out var p) && !ReferenceEquals(p, this) && !p._retired &&
+                    ReferenceEquals(p._session, _session) &&
+                    string.Equals(p._patch.Group, group, StringComparison.OrdinalIgnoreCase))
+                    peers.Add(p);
+            }
+        }
+
+        _propagating = true;
+        try { foreach (var p in peers) p.IsOn = value; }
+        finally { _propagating = false; }
     }
 
     private string Apply(bool on)
@@ -478,6 +511,10 @@ public partial class PatchItem : ObservableObject
             cave = allocated.Value;
         }
 
+        int writerLen = info.WriterLength > 0 ? info.WriterLength : original.Length;
+        bool extended = writerLen < original.Length;
+        byte[] writerBytes = extended ? original[..writerLen] : original;
+        ulong buildSite = extended ? cave + (ulong)CodeCave.TailOffset - (ulong)writerLen : site;
         byte[] code;
         int slotOffset;
         ulong slotStore = slotValue.Value;
@@ -490,7 +527,7 @@ public partial class PatchItem : ObservableObject
             if (teamMarkers is null)
                 return "Penanda tim milik pemain belum terbaca (objek pemain belum siap). Masuk ke match, gerakkan karakter, lalu nyalakan lagi.";
 
-            code = CodeCave.BuildTeamDiagMulti(original, info, MarkerStart, teamMarkers, cave, site, out immOffsets, out int dataOff);
+            code = CodeCave.BuildTeamDiagMulti(writerBytes, info, MarkerStart, teamMarkers, cave, buildSite, out immOffsets, out int dataOff);
             slotOffset = 0;
             lock (_lock) _dataOffset = dataOff;
         }
@@ -502,7 +539,7 @@ public partial class PatchItem : ObservableObject
                 if (tree is null)
                     return "Pohon sisi milik pemain belum terbaca (objek pemain belum siap). Masuk ke match, gerakkan karakter, lalu nyalakan lagi.";
 
-                code = CodeCave.BuildTreeDiag(original, info, SideTree.MaxNodes, cave, site, out slotOffset, out int treeData);
+                code = CodeCave.BuildTreeDiag(writerBytes, info, SideTree.MaxNodes, cave, buildSite, out slotOffset, out int treeData);
                 for (int i = 0; i < tree.Length; i++)
                     BitConverter.GetBytes(tree[i]).CopyTo(code, slotOffset + i * 8);
                 lock (_lock) _dataOffset = treeData;
@@ -510,11 +547,16 @@ public partial class PatchItem : ObservableObject
             }
             else
             {
-                code = CodeCave.Build(original, info, cave, site, out slotOffset);
+                code = CodeCave.Build(writerBytes, info, cave, buildSite, out slotOffset);
             }
             BitConverter.GetBytes(slotValue.Value).CopyTo(code, slotOffset);
         }
         if (!writer.Write(cave, code)) return "Gagal menulis kode patch ke memori game.";
+        if (extended)
+        {
+            var tail = CodeCave.BuildTail(original, info, cave + (ulong)CodeCave.TailOffset, site);
+            if (!writer.Write(cave + (ulong)CodeCave.TailOffset, tail)) return "Gagal menulis ekor patch ke memori game.";
+        }
 
         long rel = (long)cave - (long)(site + 5);
         if (rel > int.MaxValue || rel < int.MinValue) return "Memori patch terlalu jauh dari kode game.";
@@ -538,6 +580,12 @@ public partial class PatchItem : ObservableObject
 
     /// <summary>Kembalikan byte asli (saat Trainer ditutup atau profil diganti). Cave dibiarkan, tidak berbahaya.</summary>
     public void Restore()
+    {
+        _retired = true;
+        RestoreCore();
+    }
+
+    private void RestoreCore()
     {
         try
         {

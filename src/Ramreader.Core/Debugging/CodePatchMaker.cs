@@ -15,8 +15,8 @@ public sealed record CodePatchResult(CodePatch? Patch, string Message);
 /// </summary>
 public static class CodePatchMaker
 {
-    private static readonly int[] Pre = { 0, 4, 8, 12, 16 };
-    private static readonly int[] Post = { 4, 8, 12, 16, 24, 32 };
+    private static readonly int[] Pre = { 0, 4, 8, 12, 16, 24, 32 };
+    private static readonly int[] Post = { 4, 8, 12, 16, 24, 32, 48, 64 };
 
     public static CodePatchResult Make(ProcessMemory memory, ModuleInfo module, ulong address, string label,
         IProgress<double>? progress, CancellationToken ct)
@@ -36,6 +36,20 @@ public static class CodePatchMaker
             return Fail("Instruksi ini cabang/call, bukan penulis nilai. Pilih kandidat lain.");
 
         int length = instr.Length;
+        // Penulis kurang dari 5 byte tidak muat untuk lompatan: gabungkan dengan instruksi sesudahnya.
+        while (length < 5)
+        {
+            var next = decoder.Decode();
+            if (next.IsInvalid || length + next.Length > head.Length)
+                return Fail("Penulis kurang dari 5 byte dan instruksi sesudahnya tidak terbaca, jadi tidak bisa dibuat patch.");
+            if (next.FlowControl != FlowControl.Next && next.FlowControl != FlowControl.Return)
+                return Fail("Penulis kurang dari 5 byte dan instruksi sesudahnya cabang/call, jadi tidak bisa dibuat patch.");
+            if (next.IsIPRelativeMemoryOperand)
+                return Fail("Penulis kurang dari 5 byte dan instruksi sesudahnya memakai alamat relatif RIP, jadi tidak bisa dibuat patch.");
+            length += next.Length;
+            if (next.FlowControl == FlowControl.Return) break;
+        }
+        if (length < 5) return Fail("Penulis dan instruksi sesudahnya kurang dari 5 byte (berakhir di ret).");
         var original = head[..length];
 
         var windows = new List<(int Pre, int Post)>();

@@ -11,6 +11,7 @@ public sealed class FeatureSettings
     public string Preset { get; set; } = "";
     public string HotkeySet { get; set; } = "";
     public string HotkeyFreeze { get; set; } = "";
+    public bool AutoFreeze { get; set; }
 }
 
 public sealed class PatchSettings
