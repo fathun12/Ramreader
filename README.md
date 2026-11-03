@@ -2,14 +2,14 @@
 
 # Ramreader
 
-**A toolkit that finds stable game memory addresses and turns them into trainers, with as few game restarts as possible.**
+**Toolkit untuk menemukan alamat memori game yang stabil, lalu mengubahnya jadi trainer, dengan sesedikit mungkin restart.**
 
-**Language:** [Bahasa Indonesia](README.md) | English
+**Bahasa:** Indonesia | [English](README.en.md)
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Platform](https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white)](#getting-started)
+[![Platform](https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white)](#memulai)
 [![UI](https://img.shields.io/badge/UI-WPF%20%2B%20WPF--UI-5C2D91)](https://github.com/lepoco/wpfui)
-[![Mode](https://img.shields.io/badge/games-single--player%20only-2EA44F)](#safety-and-limits)
+[![Mode](https://img.shields.io/badge/game-single--player%20saja-2EA44F)](#keamanan-dan-batasan)
 [![Status](https://img.shields.io/badge/status-beta-orange)](#status)
 [![License](https://img.shields.io/github/license/fathun12/Ramreader)](LICENSE)
 
@@ -17,94 +17,94 @@
 
 ---
 
-## Why Ramreader
+## Mengapa Ramreader
 
-Building a single-player game trainer always stalls on one thing: a **stable memory address**. Addresses change every time the game runs (ASLR, dynamic allocation) and often break after a game update. The usual approach means quitting and relaunching the game over and over.
+Membuat trainer game single-player selalu tersandung di satu hal: **alamat memori yang stabil**. Alamat berubah tiap game dijalankan (ASLR, alokasi dinamis) dan sering patah setelah game di-update. Cara biasa menuntut keluar-masuk game berkali-kali.
 
-Ramreader guides the whole process in a Windows 11-style app, from finding an address to using it in a trainer, so you don't need to know the technical jargon to finish a workflow.
+Ramreader memandu seluruh alurnya dalam aplikasi bergaya Windows 11, dari mencari alamat sampai memakainya di trainer, sehingga kamu tidak perlu paham istilah teknis untuk menyelesaikan satu alur.
 
 ```mermaid
 flowchart LR
-    A[Pick a game] --> B[Search a value]
-    B --> C[Find a stable path]
-    C --> D[Restart the game<br/>and verify]
-    D --> E[Save the address]
-    E --> F[Code Writer<br/>and Create Patch]
-    F --> G[Use it in<br/>Ramreader Trainer]
+    A[Pilih<br/>game] --> B[Cari<br/>nilai]
+    B --> C[Cari jalur<br/>stabil]
+    C --> D[Restart game<br/>dan verifikasi]
+    D --> E[Simpan<br/>alamat]
+    E --> F[Penulis Kode<br/>dan Buat Patch]
+    F --> G[Pakai di<br/>Ramreader<br/>Trainer]
 ```
 
-## Two apps, one Core
+## Dua aplikasi, satu Core
 
-| Project | Role |
+| Proyek | Peran |
 |---|---|
-| **Ramreader** (`Ramreader.App`) | The finder: value search, stable paths, signatures, code writer, character objects, patch maker, per-game storage. |
-| **Ramreader Trainer** (`Ramreader.Trainer`) | Uses the results: feature cards, set value, freeze, code patches, hotkeys. One generic trainer for all games. |
-| **Ramreader.Core** | Shared library with no UI: memory access, scanners, pointers, signatures, code caves. |
+| **Ramreader** (`Ramreader.App`) | Alat pencari: cari nilai, jalur stabil, signature, penulis kode, objek karakter, pembuat patch, penyimpanan per game. |
+| **Ramreader Trainer** (`Ramreader.Trainer`) | Pemakai hasilnya: kartu fitur, set nilai, kunci (freeze), patch kode, hotkey. Satu trainer generik untuk semua game. |
+| **Ramreader.Core** | Pustaka bersama tanpa UI: akses memori, scanner, pointer, signature, code cave. |
 
-They are two separate applications, not one program. They are linked through JSON files in `%AppData%`: Ramreader saves the results and the Trainer reads them.
+Keduanya aplikasi terpisah, bukan satu program. Mereka terhubung lewat berkas JSON di `%AppData%`: Ramreader menyimpan hasil, Trainer membacanya.
 
-## Features
+## Fitur
 
-**Ramreader (finder)**
+**Ramreader (pencari)**
 
-- **Value search** in the style of Cheat Engine: exact, changed, unchanged, increased, decreased. Supports int32, float, int64, and double.
-- **Snapshot and value range** for values that are not shown as numbers (for example an HP bar).
-- **Stable Path**: multi-level pointer search (BFS) toward the target address, then **verification after a game restart** to keep only paths that really survive.
-- **Signature (AOB)**: byte patterns with wildcards, generated automatically from game code, as a fallback when a path breaks after an update.
-- **Code Writer**: a hardware-breakpoint debugger that captures the instruction writing to an address ("find out what writes").
-- **Character Object**: inspects character objects in memory and the side structure (team and enemy), including a reverse container search.
-- **Create Patch**: builds a code cave from the captured instruction.
-- **Saved**: per-game addresses read live from the game, stored on disk, and **exported as a JSON profile**.
-- **Modern UI**: Fluent, dark, Mica, side navigation, and a status bar that always shows the next step.
+- **Cari Nilai** bergaya Cheat Engine: nilai tepat, berubah, tidak berubah, bertambah, berkurang. Mendukung int32, float, int64, dan double.
+- **Snapshot dan rentang nilai** untuk nilai yang tidak tampil sebagai angka (misalnya bar HP).
+- **Jalur Stabil**: pencarian pointer multi-level (BFS) menuju alamat target, lalu **verifikasi setelah restart game** untuk menyaring jalur yang benar-benar bertahan.
+- **Signature (AOB)**: pola byte dengan wildcard yang dibuat otomatis dari kode game, sebagai cadangan kalau jalur putus setelah update.
+- **Penulis Kode**: debugger berbasis hardware breakpoint yang menangkap instruksi yang menulis ke sebuah alamat ("find out what writes").
+- **Objek Karakter**: memeriksa objek karakter di memori dan struktur sisi (tim dan musuh), termasuk pencarian penampung objek.
+- **Buat Patch**: membuat code cave dari instruksi yang tertangkap.
+- **Tersimpan**: alamat per game dibaca langsung dari game (live), disimpan di disk, dan **diekspor sebagai profil JSON**.
+- **UI modern**: Fluent, dark, Mica, navigasi samping, bilah status yang selalu memberi langkah berikutnya.
 
 **Ramreader Trainer**
 
-- **Set value** with range validation, and **freeze** a value.
-- **Preset and auto-freeze**: a value is locked once when the game is detected (for example, a team bar that is always 100).
-- **Code patches** through toggles, e.g. HP, chakra, cooldowns. A player-only code cave means **enemies stay normal**.
-- **Patch modes** that decide who is protected (see [Patch modes](#patch-modes)).
-- Global hotkeys (still being tested).
+- **Set nilai** dengan validasi rentang, dan **Kunci (freeze)** nilai.
+- **Preset dan kunci otomatis**: nilai dikunci sekali saat game terdeteksi (contoh: bar tim selalu 100).
+- **Patch kode** lewat toggle, mis. HP, chakra, cooldown. Dengan code cave khusus pemain, sehingga **musuh tetap normal**.
+- **Mode patch** untuk menentukan siapa yang terlindungi (lihat [Mode patch](#mode-patch)).
+- Hotkey global (masih dalam pengujian).
 
 ## Status
 
-This project is in **beta**. "Proven" below means tested by the author on the test game, not a guarantee for every game.
+Proyek ini **beta**. "Terbukti" di bawah berarti sudah diuji pembuat di game uji, bukan jaminan untuk semua game.
 
-| Part | Status |
+| Bagian | Status |
 |---|---|
-| Attach to a process and read memory | Proven |
-| Value search (first and next scan), Snapshot | Proven |
-| Range scan (between) | Code in place, not tested |
-| Stable Path + restart verification | Proven |
-| Signature (AOB) | Proven on the test game |
-| Saved + Export Profile | Proven |
-| Code Writer + Create Patch | Proven |
-| Trainer: set value and freeze | Proven |
-| Trainer: auto-freeze (Preset + AutoFreeze) | Proven (team bar) |
-| Trainer: code patches (HP, chakra, summon cooldown) | Proven |
-| Trainer: unlimited Tag Switch and Kawarimi | Reported stable; Tag Switch after a PC restart not tested |
-| Tree mode (the whole player side, including mirror matches) | Proven for HP and chakra |
-| Global hotkeys, per-feature min/max limits | Code in place, not tested |
-| Games other than the test game (NSUNSC) | Not tested |
+| Menyambung ke proses dan membaca memori | Terbukti |
+| Cari Nilai (scan pertama dan lanjutan), Snapshot | Terbukti |
+| Scan Rentang (between) | Kode terpasang, belum dites |
+| Jalur Stabil + verifikasi restart | Terbukti |
+| Signature (AOB) | Terbukti di game uji |
+| Tersimpan + Ekspor Profil | Terbukti |
+| Penulis Kode + Buat Patch | Terbukti |
+| Trainer: set nilai dan kunci | Terbukti |
+| Trainer: kunci otomatis (Preset + AutoFreeze) | Terbukti (bar tim) |
+| Trainer: patch kode (HP, chakra, cooldown summon) | Terbukti |
+| Trainer: Tag Switch dan Kawarimi tanpa batas | Dilaporkan stabil; Tag Switch setelah restart PC belum dites |
+| Mode Tree (seluruh sisi pemain, termasuk mirror match) | Terbukti untuk HP dan chakra |
+| Hotkey global, batas min/max per fitur | Kode terpasang, belum dites |
+| Game selain game uji (NSUNSC) | Belum diuji |
 
-Test game: **NSUNSC** (Naruto x Boruto: Ultimate Ninja Storm Connections), offline mode.
+Game uji: **NSUNSC** (Naruto x Boruto: Ultimate Ninja Storm Connections), mode offline.
 
 <!--
-## Screenshots
-Put images in docs/screenshots, then remove this comment, e.g.:
-![Value search](docs/screenshots/value-search.png)
-![Stable path](docs/screenshots/stable-path.png)
-![Saved](docs/screenshots/saved.png)
+## Tangkapan layar
+Taruh gambar di folder docs/screenshots lalu hapus tanda komentar ini, mis.:
+![Cari Nilai](docs/screenshots/cari-nilai.png)
+![Jalur Stabil](docs/screenshots/jalur-stabil.png)
+![Tersimpan](docs/screenshots/tersimpan.png)
 -->
 
-## Getting started
+## Memulai
 
-**Requirements**
+**Prasyarat**
 
 - Windows 11, 64-bit
 - [.NET SDK 10.0](https://dotnet.microsoft.com/download)
-- Run the terminal or VS Code **as Administrator** (needed to open the game process)
+- Jalankan terminal atau VS Code **sebagai Administrator** (diperlukan untuk membuka proses game)
 
-**Build and run**
+**Build dan jalankan**
 
 ```powershell
 git clone https://github.com/fathun12/Ramreader.git
@@ -114,56 +114,56 @@ dotnet run --project src\Ramreader.App
 dotnet run --project src\Ramreader.Trainer
 ```
 
-Run Ramreader and the Trainer from separate Administrator terminals, or start both from one Administrator terminal.
+Jalankan Ramreader dan Trainer di terminal Administrator terpisah, atau jalankan keduanya dari satu terminal Administrator.
 
-## How to use
+## Cara memakai
 
-### 1. Find a stable address (Ramreader)
+### 1. Cari alamat stabil (Ramreader)
 
-1. **Process**: pick the running game and connect.
-2. **Value search**: scan the value you see in the game. Change it in the game, then Next Scan until few addresses remain. Pick one and click **Set as Target**.
-3. **Stable Path**: click **Find Path**, close and reopen the game, search the value again, then **Verify**. Repeat until only a few paths remain.
-4. **Save Address** with a label (for example "HP"), then check the **Saved** menu.
+1. **Proses**: pilih game yang sedang berjalan, lalu hubungkan.
+2. **Cari Nilai**: scan nilai yang kamu lihat di game. Ubah nilainya di game, lalu Scan Lanjutan sampai tinggal sedikit alamat. Pilih satu dan klik **Jadikan Target**.
+3. **Jalur Stabil**: klik **Cari Jalur**, tutup dan buka lagi game, cari nilainya lagi, lalu **Verifikasi**. Ulangi sampai tinggal sedikit jalur.
+4. **Simpan Alamat** dengan label (misalnya "HP"), lalu lihat di menu **Tersimpan**.
 
-Tip: for bars with round values (100, 75, 50), a First Scan with the value you see is more accurate than a Snapshot.
+Tips: untuk bar yang bernilai bulat (100, 75, 50), Scan Pertama dengan nilai yang kamu lihat lebih akurat daripada Snapshot.
 
-### 2. Create a patch (optional, for features such as God Mode)
+### 2. Buat patch (opsional, untuk fitur seperti God Mode)
 
-1. Open **Code Writer**, pick a saved address, then **Start Monitoring**.
-2. Perform the action in the game (take damage, use a skill) until the writer instruction appears.
-3. Pick the full writer instruction row, not an overlapping byte-fragment row, then **Create Patch**.
-4. Click **Stop** before closing Ramreader.
+1. Buka **Penulis Kode**, pilih alamat tersimpan, lalu **Mulai Pantau**.
+2. Lakukan aksinya di game (kena damage, pakai skill) sampai instruksi penulis muncul.
+3. Pilih baris instruksi penulis yang utuh, bukan baris potongan byte yang tumpang tindih dengannya, lalu **Buat Patch**.
+4. Klik **Berhenti** sebelum menutup Ramreader.
 
-### 3. Use it in the Trainer
+### 3. Pakai di Trainer
 
-1. Start the game, then Ramreader Trainer. The Trainer loads the game profile from the saved session.
-2. Activate the feature cards: set value, freeze, or patch toggles.
-3. **Turn patch toggles off before closing the Trainer.**
+1. Jalankan game, lalu Ramreader Trainer. Trainer memuat profil game dari sesi tersimpan.
+2. Aktifkan kartu fitur: set nilai, kunci, atau toggle patch.
+3. **Matikan toggle patch sebelum menutup Trainer.**
 
-## Patch modes
+## Mode patch
 
-The mode decides who a patch protects. Set it with the `Mode` field of the patch in the session file (see [Data locations](#data-locations)).
+Mode menentukan siapa yang terlindungi oleh sebuah patch. Atur lewat field `Mode` pada patch di berkas sesi (lihat [Lokasi data](#lokasi-data)).
 
-| Mode | Behavior |
+| Mode | Perilaku |
 |---|---|
-| empty (default) | The player's main character only. Enemies stay normal. |
-| `Team` | The whole player team, using a 12-byte marker in the character object. Does not support mirror matches (both sides share the same main character). |
-| `Tree` | The whole player side by walking the side tree structure. Supports mirror matches. Built from the test game's object structure. |
-| `Nop` | Plain NOP. **Not recommended**: enemies become invulnerable too because the instruction is shared. |
+| kosong (bawaan) | Hanya karakter utama pemain. Musuh normal. |
+| `Team` | Seluruh tim pemain, memakai penanda 12 byte di objek karakter. Tidak mendukung mirror match (karakter utama kedua sisi sama). |
+| `Tree` | Seluruh sisi pemain dengan menelusuri struktur pohon sisi. Mendukung mirror match. Dibuat dari struktur objek game uji. |
+| `Nop` | NOP polos. **Tidak disarankan**: musuh ikut kebal karena instruksinya dipakai bersama. |
 
-Changing `Mode` is done by text replacement in the JSON. **Do not** read and rewrite the JSON with `ConvertFrom-Json` and `ConvertTo-Json` in PowerShell 5.1: dates get corrupted and the profile disappears from the Trainer. Make a backup (`.bak`) first, replace the text only, and check that the replacement count matches.
+Mengubah `Mode` dilakukan dengan penggantian teks di JSON. **Jangan** membaca lalu menulis ulang JSON lewat `ConvertFrom-Json` dan `ConvertTo-Json` di PowerShell 5.1: format tanggal rusak dan profil hilang dari Trainer. Buat cadangan (`.bak`) dulu, ganti teksnya saja, lalu pastikan jumlah penggantiannya sesuai.
 
-## Data locations
+## Lokasi data
 
-| Data | Location |
+| Data | Lokasi |
 |---|---|
-| Sessions and saved addresses | `%AppData%\Ramreader\sessions\<game>.json` |
-| Candidate paths | `%AppData%\Ramreader\chains\<game>.txt` |
-| Per-feature Trainer settings | `%AppData%\Ramreader.Trainer\settings\<game>.json` |
+| Sesi dan alamat tersimpan | `%AppData%\Ramreader\sessions\<game>.json` |
+| Jalur kandidat | `%AppData%\Ramreader\chains\<game>.txt` |
+| Pengaturan Trainer per fitur | `%AppData%\Ramreader.Trainer\settings\<game>.json` |
 
-## Game profile format
+## Format profil game
 
-The export is a JSON file read by the trainer (example):
+Hasil ekspor adalah JSON yang dibaca trainer (contoh):
 
 ```json
 {
@@ -185,32 +185,32 @@ The export is a JSON file read by the trainer (example):
 }
 ```
 
-Path format: `Module|ModuleOffset|offset1,offset2,...` (hex). The address is computed by reading the pointer at `Module+ModuleOffset`, adding the first offset, then repeating for the next offsets. `MainModuleSize` helps the trainer detect that the game has been updated.
+Format jalur: `Modul|OffsetModul|offset1,offset2,...` (hex). Alamat dihitung dengan membaca pointer di `Modul+OffsetModul`, menambah offset pertama, lalu mengulang untuk offset berikutnya. `MainModuleSize` membantu trainer mendeteksi bahwa game sudah di-update.
 
-## Using it on other games
+## Memakai di game lain
 
-The workflow is general, but it has only been tested on one game. What you should know:
+Alurnya umum, tetapi baru teruji di satu game. Yang perlu kamu ketahui:
 
-- Address search (Value search, Stable Path, Signature) does not depend on a specific game.
-- `Tree` mode was built from the test game's object structure. Other games almost certainly have a different structure, so the side marker has to be found again with **Character Object**. For ordinary single-player games, the empty mode may be enough.
-- Games with Denuvo or anti-cheat may refuse access to their process. Check the game's protection first.
+- Pencarian alamat (Cari Nilai, Jalur Stabil, Signature) tidak bergantung pada game tertentu.
+- Mode `Tree` dibuat dari struktur objek game uji. Game lain hampir pasti punya struktur berbeda, jadi penanda sisi perlu dicari ulang lewat **Objek Karakter**. Untuk game single-player biasa, Mode kosong mungkin sudah cukup.
+- Game dengan Denuvo atau anti-cheat bisa menolak akses ke prosesnya. Periksa proteksi game dulu.
 
-## Architecture
+## Arsitektur
 
 ```
 src/
-  Ramreader.Core/            pure logic, no UI dependency
+  Ramreader.Core/            logika murni, tanpa dependensi UI
     Memory/                  ProcessMemory, ProcessLister, P/Invoke
     Scanning/                ValueScanner, AobPattern, AobScanner,
                              RipReferenceScanner, SignatureMaker, SignatureResolver
     Pointers/                PointerScanner, PointerVerifier, PointerChain, AddressResolver
     Debugging/               CodeCave, SideTree, ReversePointerFinder
     Models/                  SavedAddress, SignatureRef, GameProfile, ...
-  Ramreader.App/             WPF + MVVM (finder)
-    Views/ ViewModels/       pages and view logic
+  Ramreader.App/             WPF + MVVM (pencari)
+    Views/ ViewModels/       halaman dan logika tampilan
     Services/                GameSession, SavedStore, ChainStore
-    Themes/AppStyles.xaml    all styling in one place
-  Ramreader.Trainer/         WPF (generic trainer)
+    Themes/AppStyles.xaml    semua gaya tampilan di satu tempat
+  Ramreader.Trainer/         WPF (trainer generik)
     Services/                TrainerSession, ProfileStore, MemoryWriter,
                              SettingsStore, HotkeyService
     ViewModels/              MainViewModel, FeatureItem, PatchItem
@@ -218,30 +218,30 @@ src/
 
 Stack: **C# / .NET 10**, **WPF**, [WPF-UI](https://github.com/lepoco/wpfui) 4.3.0, [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) 8.4.2, `Microsoft.Extensions.DependencyInjection`.
 
-Algorithm design, proof history, and dead ends are documented in [`SPEC.md`](SPEC.md) (in Indonesian).
+Detail desain algoritma, riwayat bukti, dan jalan buntu ada di [`SPEC.md`](SPEC.md).
 
-## Safety and limits
+## Keamanan dan batasan
 
-- **Searching is read-only.** Value search, Stable Path, and Signature only read game memory.
-- **Code Writer uses a debugger** (hardware breakpoint) on the game. **The Trainer writes to game memory** and installs code caves for patches.
-- **Single-player / offline games only.** Do not use it in online or competitive games.
-- **It does not bypass anti-cheat.** Games protected by Denuvo or kernel anti-cheat may refuse access or detect this activity. That is outside the scope of this project.
-- **Force-closing is risky.** Force-closing the Trainer while a patch is on can leave a jump to an old code cave in the game: turn toggles off first. Click **Stop** in Ramreader before closing it (suspected, not proven: force-closing while monitoring leaves a breakpoint behind and can crash the game).
-- You are responsible for how you use it and for complying with the terms of service of the game you use it on.
+- **Pencarian bersifat baca.** Cari Nilai, Jalur Stabil, dan Signature hanya membaca memori game.
+- **Penulis Kode memakai debugger** (hardware breakpoint) pada game. **Trainer menulis ke memori game** dan memasang code cave untuk patch.
+- **Hanya untuk game single-player / offline.** Jangan dipakai di game online atau kompetitif.
+- **Tidak membypass anti-cheat.** Game dengan perlindungan seperti Denuvo atau anti-cheat kernel bisa menolak akses atau mendeteksi aktivitas ini. Itu di luar tujuan proyek.
+- **Penutupan paksa berisiko.** Menutup Trainer paksa saat patch menyala dapat meninggalkan lompatan ke code cave lama di game: matikan toggle dulu. Klik **Berhenti** di Ramreader sebelum menutupnya (dugaan, belum terbukti: menutup paksa saat memantau meninggalkan breakpoint dan bisa membuat game crash).
+- Kamu bertanggung jawab atas penggunaannya dan atas kepatuhan pada syarat layanan game yang kamu pakai.
 
 ## Roadmap
 
-- [x] RAM reader, Value search, Stable Path, Saved, Export Profile
-- [x] Snapshot (unknown initial value)
+- [x] Pembaca RAM, Cari Nilai, Jalur Stabil, Tersimpan, Ekspor Profil
+- [x] Snapshot (nilai awal tidak diketahui)
 - [x] Signature (AOB)
-- [x] Simple debugger (hardware breakpoint) for "find out what writes"
-- [x] `Ramreader.Trainer`: set value, freeze, code patches, Team and Tree modes
-- [ ] Field verification: range scan, global hotkeys
-- [ ] Test on games other than the test game
-- [ ] Pointer scan for multiple targets at once
-- [ ] Option to add other DLLs as static modules
-- [ ] 1/2 byte types, array of bytes, hex viewer
+- [x] Debugger sederhana (hardware breakpoint) untuk "find out what writes"
+- [x] `Ramreader.Trainer`: set nilai, kunci, patch kode, Mode Team dan Tree
+- [ ] Verifikasi lapangan: Scan Rentang, hotkey global
+- [ ] Uji di game selain game uji
+- [ ] Pointer scan dengan banyak target sekaligus
+- [ ] Opsi menambah DLL lain sebagai modul statis
+- [ ] Tipe 1/2 byte, array of bytes, hex viewer
 
-## License
+## Lisensi
 
-Released under the [MIT License](LICENSE).
+Dirilis di bawah [MIT License](LICENSE).
