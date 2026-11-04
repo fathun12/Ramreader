@@ -5,7 +5,7 @@
 
 ## 0. Prompt pembuka untuk sesi baru
 
-**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku.**
+**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku. Lanjutan 2g ada di 2h (hasil bongkar kode).**
 
 Tempel ini bersama isi dokumen ini:
 
@@ -258,6 +258,20 @@ Hanya mencatat pekerjaan satu sesi AI. Penentu durasi Awakening BELUM ditemukan.
 - Permintaan user (sudah disuruh): fitur "Lihat Kode" di Ramreader, yang menampilkan beberapa instruksi sebelum dan sesudah sebuah lokasi tanpa Cheat Engine; Core sudah memakai disassembler Iced di WriteTracer. BELUM dibangun karena file Ramreader.App belum dibaca sesi ini. Minta dulu lewat satu perintah Set-Clipboard (aturan 14): src\Ramreader.App\App.xaml.cs, src\Ramreader.App\MainWindow.xaml, Views\CharacterObjectsPage.xaml dan .xaml.cs, ViewModels\CharacterObjectsViewModel.cs, src\Ramreader.Core\Debugging\WriteTracer.cs. Setelah itu bangun sesuai pola halaman Objek Karakter, lalu beri perintah tutup, build, buka (aturan 22).
 
 **Peringatan.** Toggle "Awakening Tanpa Batas" mungkin masih menyala di Trainer user: suruh matikan sebelum menutup Trainer (lompatan ke cave bisa tertinggal di game). Profil user kini berisi dua patch buatan itu dan dua kartu durasi; profil user tidak boleh masuk rilis.
+
+## 2h. Lanjutan 2g, 4 Nov 2026 (hasil bongkar kode, durasi Awakening, BELUM SELESAI). BACA INI SETELAH 2g
+
+Fakta (hasil disassembler capstone atas byte yang user salin dari game lewat perintah baca-saja, dan angka dari layar user).
+- Fungsi sekitar +73B8D0 (dan blok float +73B78B..+73B7A7) adalah pembaruan HUD: nilai dibaca dari getter, dibandingkan dengan cache, disimpan ke cache (+1C0 int, +1BC float), dibagi maksimum, dijepit 0..1, lalu dikirim ke widget (call +72C170). Patch di sana hanya menahan gambar bar; Awakening tetap habis (laporan user). Jangan dipatch lagi.
+- Getter int +A2CC60: sub = [r15+11758h]. Kalau [this+0EA4h] bukan 0x7C: entri = +9AE800(sub, 1); kalau entri bukan null dan [entri+10h] bukan -1, nilai = [entri+10h]. Selain itu nilai = byte[global+952h] * [rec+40h], rec = +988AC0(+9AE200(sub)). Getter maksimum +A2CC20 memakai rumus yang kedua. Getter float +A2CB50 membaca [r15+12B0Ch] (fungsi tidak diketahui).
+- +9AE800(sub, ebp): menelusuri daftar berantai di [[sub+18h]+38h]; per simpul: entri = [simpul+10h], id = [entri+8], rec = +988AE0(id); mengembalikan entri pertama dengan [rec+0Ch] == ebp.
+- Dump user (sesi PID 34664; alamat mentah, jangan disimpan): Cari Nilai 4 byte, nilai tepat 886 lalu Nilai berkurang menyisakan 2 alamat (829 ke 738). Alamat 0x22F99CF3AA0 punya [-8]=187, [-4]=900, [0]=738, [+4]=float -1.0, [+8]=penunjuk heap. Alamat 0x22FEC131810 punya float di [-4] dan tidak ada ID. Kartu "durasi awekening 5" (jalur +21BE600 -> +720, nilai 738) terbukti ditulis +73B8D0 (168 hit, layar user).
+
+Dugaan (belum terbukti). 0x22F99CF3AA0 adalah entri timer asli (id di entri+8, nilai di entri+10h, entri = alamat - 0x10, 900 di entri+0Ch cocok dengan getter); 0x22FEC131810 adalah cache HUD. Maksimum 900 = 60 x 15 (byte global+952h = 60 mungkin). Entri mungkin dibuat ulang tiap Awakening (alamatnya berubah, jalur tetap +21BE600 hanya menunjuk cache).
+
+Tidak diketahui. Siapa yang menurunkan [entri+10h]; arti ID 187 dan status 0x7C; fungsi float [r15+12B0Ch]; kenapa alamat 0x22FEC1C8C90 naik 78 ke 866 (mode Nilai bertambah) padahal durasi turun; apakah entri ada di luar snapshot 3 GB.
+
+Langkah berikut. User menyuruh membangun alat di Ramreader (membaca halaman memori dan entri, plus Lihat Kode). Perintah Set-Clipboard permintaan file sudah diberikan (daftar berkas di 2g). Bangun: (1) Lihat Kode (disassembly Iced di RVA); (2) pemantau tulis untuk alamat tanpa kartu. Setelah itu pantau penulis [entri+10h]; patch dibuat di penulis itu, bukan di +73B8D0. Cek apakah instruksi itu juga dipakai musuh (aturan 20).
 
 ## 3. Lingkungan user
 
