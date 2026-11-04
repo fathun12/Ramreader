@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Ramreader.App.Services;
 using Ramreader.App.ViewModels;
@@ -24,6 +24,7 @@ public partial class App : Application
         services.AddSingleton<SignatureViewModel>();
         services.AddSingleton<CodeWriterViewModel>();
         services.AddSingleton<CharacterObjectsViewModel>();
+        services.AddSingleton<CodeViewViewModel>();
 
         services.AddSingleton<ProcessPage>();
         services.AddSingleton<ScanPage>();
@@ -31,6 +32,7 @@ public partial class App : Application
         services.AddSingleton<SignaturePage>();
         services.AddSingleton<CodeWriterPage>();
         services.AddSingleton<CharacterObjectsPage>();
+        services.AddSingleton<CodeViewPage>();
         services.AddSingleton<SavedPage>();
 
         Services = services.BuildServiceProvider();
