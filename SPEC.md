@@ -291,6 +291,16 @@ Keputusan user. Cukup mengunci nilai kartu 6.1; patch kode di +97B97F tidak dibu
 
 Belum diverifikasi (aturan 25, minimal 3 kondisi). Berhasil satu kali. Tidak diketahui: apakah jalur 6.1 tetap benar di Awakening berikutnya, setelah rematch, dan setelah ganti karakter; apakah mengunci nilai berefek pada musuh atau karakter lain; apa yang terjadi saat Awakening berakhir sementara nilai masih terkunci. Jangan mencatat "terbukti" sebelum user melaporkan tiga kondisi itu dari layarnya. Profil user (kartu) tidak boleh masuk rilis (aturan 28).
 
+## 2l. Hasil Lihat Kode di +97B97F (4 Nov 2026). BACA SETELAH 2j dan 2k
+
+Fakta (bongkaran Lihat Kode, dibaca user dari game saat Awakening hidup; byte +97B97F masih asli 89 4F 10). Fungsi di sekitar +97B97F mengurangi timer satu entri (rdi = entri). Urutan: ecx = [rdi+8] (id); rec = +988AE0(id); kalau rec ada dan [rec+0Ch] = 1 maka +9CFE80([rdi+18h], 6, 1) dipanggil di +97B965, dan kalau hasilnya tidak nol (+97B96C jne) pengurangan dilewati (lompat ke +97B9BE). Kalau tidak: ecx = [rdi+10h]; kalau negatif (-1) lewati; ecx = ecx - cvttss2si([+21D0884]); [rdi+10h] = ecx (+97B97F); kalau ecx <= 0: [rdi+10h] = ebp dan panggil +97C120 (penutup efek).
+
+Dugaan (belum terbukti). Kategori 1 = kategori entri yang dibaca HUD lewat getter +A2CC60 (2h). Mengganti 75 50 di +97B96C menjadi EB 50 membuat entri kategori 1 selalu melewati pengurangan tanpa menyentuh kategori lain dan tanpa bergantung pada alamat entri. Pola AOB rancangan (dari byte di Lihat Kode, mulai +97B961, 48 byte; byte instruksi jne dijadikan ??): 44 8D 42 FB E8 ?? ?? ?? ?? 85 C0 ?? ?? 8B 4F 10 85 C9 78 49 F3 0F 2C 05 ?? ?? ?? ?? 2B C8 89 4F 10 85 C9 7F 38 48 8B CF 89 6F 10 E8 ?? ?? ?? ??; InstructionOffset 11; OriginalBytes 75 50; PatchBytes EB 50; Mode Nop. Keunikan pola belum diperiksa: Trainer melapor kalau cocok di lebih dari satu tempat.
+
+Tidak diketahui. Apakah musuh atau efek lain juga berkategori 1 (kalau ya, mode Nop membuat Awakening musuh ikut tidak habis; aturan 20); apa fungsi +9CFE80; apakah Awakening juga berakhir lewat jalur lain (chakra habis).
+
+Langkah berikut. Menunggu potongan JSON kartu "durasi awekening 6.1" dari user (aturan 29), lalu menyisipkan patch ke kartu itu lewat penggantian teks dengan cadangan.
+
 ## 3. Lingkungan user
 
 - Windows 11, VS Code, terminal **PowerShell 5.1**, root `D:\Projects\Ramreader`.
