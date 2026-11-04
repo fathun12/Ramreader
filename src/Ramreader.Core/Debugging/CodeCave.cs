@@ -373,6 +373,79 @@ public static class CodeCave
     public const int TailOffset = 0x800;
 
     /// <summary>
+    /// Cave "pemilik efek" untuk hook call (E8 rel32, 5 byte): panggil target asli; kalau hasilnya 0 dan [rdi+18h] sama dengan
+    /// salah satu slot (pemilik efek milik sisi pemain), hasilnya dipaksa 1. Hanya rax yang disentuh.
+    /// Blok data (24 byte) di dataOffset: +0 dipaksa 1, +4 dibiarkan, +8 pemilik terakhir dipaksa, +16 pemilik terakhir dibiarkan.
+    /// </summary>
+    public static byte[] BuildCallOwner(ulong callTarget, int slotCount, ulong caveAddress, ulong instructionAddress,
+        out int slotsOffset, out int dataOffset)
+    {
+        ulong ret = instructionAddress + 5;
+        var code = new List<byte>(256);
+        var fixups = new List<(int Pos, bool IsSlot, int Index)>();
+        var jes = new List<int>();
+
+        void RipRef(bool isSlot, int index)
+        {
+            fixups.Add((code.Count, isSlot, index));
+            code.AddRange(new byte[4]);
+        }
+
+        code.Add(0xE8);                                        // call target asli
+        code.AddRange(BitConverter.GetBytes(Rel(callTarget, caveAddress + 5)));
+        code.Add(0x85); code.Add(0xC0);                        // test eax,eax
+        code.Add(0x0F); code.Add(0x85);                        // jne selesai (hasil sudah tidak nol)
+        int jneAt = code.Count;
+        code.AddRange(new byte[4]);
+        code.Add(0x48); code.Add(0x8B); code.Add(0x47); code.Add(0x18);   // mov rax,[rdi+18h]
+        for (int i = 0; i < slotCount; i++)
+        {
+            code.Add(0x48); code.Add(0x3B); code.Add(0x05);    // cmp rax,[rip+slot_i]
+            RipRef(true, i);
+            code.Add(0x0F); code.Add(0x84);                    // je cocok
+            jes.Add(code.Count);
+            code.AddRange(new byte[4]);
+        }
+        code.Add(0xFF); code.Add(0x05);                        // dibiarkan++
+        RipRef(false, 4);
+        code.Add(0x48); code.Add(0x89); code.Add(0x05);        // pemilik terakhir dibiarkan
+        RipRef(false, 16);
+        code.Add(0x31); code.Add(0xC0);                        // xor eax,eax (hasil asli 0)
+        code.Add(0xE9);                                        // jmp selesai
+        int jmpDoneAt = code.Count;
+        code.AddRange(new byte[4]);
+
+        int matchStart = code.Count;
+        code.Add(0xFF); code.Add(0x05);                        // dipaksa++
+        RipRef(false, 0);
+        code.Add(0x48); code.Add(0x89); code.Add(0x05);        // pemilik terakhir dipaksa
+        RipRef(false, 8);
+        code.Add(0xB8);                                        // mov eax,1
+        code.AddRange(BitConverter.GetBytes(1));
+
+        int doneStart = code.Count;
+        code.Add(0xE9);                                        // jmp balik ke game (sesudah call)
+        int jmpRetAt = code.Count;
+        code.AddRange(BitConverter.GetBytes(Rel(ret, caveAddress + (ulong)jmpRetAt + 4)));
+
+        slotsOffset = (code.Count + 7) & ~7;
+        dataOffset = slotsOffset + slotCount * 8;
+        while (code.Count < dataOffset + 24) code.Add(0);
+
+        var bytes = code.ToArray();
+        BitConverter.GetBytes(doneStart - (jneAt + 4)).CopyTo(bytes, jneAt);
+        BitConverter.GetBytes(doneStart - (jmpDoneAt + 4)).CopyTo(bytes, jmpDoneAt);
+        foreach (int at in jes)
+            BitConverter.GetBytes(matchStart - (at + 4)).CopyTo(bytes, at);
+        foreach (var (pos, isSlot, index) in fixups)
+        {
+            int target = isSlot ? slotsOffset + index * 8 : dataOffset + index;
+            BitConverter.GetBytes(target - (pos + 4)).CopyTo(bytes, pos);
+        }
+        return bytes;
+    }
+
+    /// <summary>
     /// Ekor cave untuk patch gabungan: salinan instruksi sesudah penulis (ikut tertimpa lompatan 5 byte),
     /// lalu lompat ke game sesudah semuanya (kecuali ekornya berakhir ret).
     /// </summary>

@@ -19,6 +19,7 @@ public partial class MainViewModel : ObservableObject
     private volatile PatchItem[] _patchArray = Array.Empty<PatchItem>();
     private volatile int _freezeIntervalMs = 10;
     private HotkeyService? _hotkeys;
+    private InstantAwakeningItem? _instant;
     private bool _loadingSettings;
 
     public TrainerSession Session { get; } = new();
@@ -127,6 +128,13 @@ public partial class MainViewModel : ObservableObject
 
         hotkeys.UnregisterAll();
 
+        if (_instant is not null)
+        {
+            var instantProblems = new List<string>();
+            RegisterOne(hotkeys, _instant.HotkeyText, _instant.HotkeyToggle, "Awakening Instan", instantProblems);
+            _instant.HotkeyStatus = string.Join("  •  ", instantProblems);
+        }
+
         foreach (var feature in Features)
         {
             var problems = new List<string>();
@@ -180,6 +188,8 @@ public partial class MainViewModel : ObservableObject
             settings.Features[feature.Label] = feature.ToSettings();
         foreach (var patch in Patches)
             settings.Patches[patch.Label] = patch.ToSettings();
+        if (_instant is not null)
+            settings.Patches[InstantAwakeningItem.CardLabel] = _instant.ToSettings();
 
         try
         {
@@ -209,6 +219,9 @@ public partial class MainViewModel : ObservableObject
         Features.Clear();
         Patches.Clear();
         Cards.Clear();
+
+        if (_instant is not null) _instant.SettingsChanged -= OnFeatureSettingsChanged;
+        _instant = null;
 
         if (value is null)
         {
@@ -250,6 +263,15 @@ public partial class MainViewModel : ObservableObject
 
         _featureArray = Features.ToArray();
         _patchArray = Patches.ToArray();
+
+        if (InstantAwakeningItem.CanBuild(Features, Patches))
+        {
+            _instant = new InstantAwakeningItem(Features, Patches);
+            if (settings.Patches.TryGetValue(InstantAwakeningItem.CardLabel, out var storedInstant))
+                _instant.ApplySettings(storedInstant);
+            _instant.SettingsChanged += OnFeatureSettingsChanged;
+            Cards.Add(_instant);
+        }
 
         // Pindah ke game lain: putuskan koneksi lama.
         if (Session.Memory is { } memory &&
@@ -326,6 +348,7 @@ public partial class MainViewModel : ObservableObject
             feature.Update(memory);
         foreach (var patch in Patches)
             patch.Update(memory);
+        _instant?.Refresh();
     }
 
     /// <summary>Cari proses game sesuai profil dan sambungkan kalau sudah berjalan.</summary>

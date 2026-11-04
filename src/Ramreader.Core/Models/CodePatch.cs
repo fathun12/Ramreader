@@ -28,6 +28,12 @@ public sealed class CodePatch
     public int MarkerOffset { get; set; } = 0x44;
     /// <summary>Patch dengan Group sama (tidak kosong) dinyalakan/dimatikan bersama di Trainer.</summary>
     public string Group { get; set; } = "";
+
+    /// <summary>Mode "TreeOwner": displacement alamat nilai kartu terhadap register basis (HP = 0x10).</summary>
+    public int BaseDisp { get; set; } = 0x10;
+
+    /// <summary>Mode "TreeOwner": offset penunjuk pemilik efek di dalam simpul karakter.</summary>
+    public int OwnerOffset { get; set; } = 0x30;
     public DateTime CreatedAt { get; set; }
 
     public static string ToHex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));

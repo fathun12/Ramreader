@@ -220,6 +220,57 @@
                                 </Border>
                             </DataTemplate>
 
+                        <!-- Kartu Awakening Instan -->
+                            <DataTemplate DataType="{x:Type vm:InstantAwakeningItem}">
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="16"
+                                                           FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Detail}"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap"
+                                                           Style="{StaticResource MutedText}" />
+                                            </StackPanel>
+
+                                            <ui:ToggleSwitch Grid.Column="1"
+                                                             Margin="16,0,0,0"
+                                                             VerticalAlignment="Center"
+                                                             Content="Aktif"
+                                                             IsChecked="{Binding IsOn, Mode=TwoWay}" />
+                                        </Grid>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                            <TextBlock Text="Hotkey"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,10,0"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <ui:TextBox Width="120"
+                                                        PlaceholderText="mis. F10"
+                                                        Text="{Binding HotkeyText, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   Margin="0,8,0,0"
+                                                   FontSize="12"
+                                                   TextWrapping="Wrap"
+                                                   Style="{StaticResource MutedText}" />
+                                        <TextBlock Text="{Binding HotkeyStatus}"
+                                                   Margin="0,2,0,0"
+                                                   FontSize="12"
+                                                   Style="{StaticResource MutedText}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
                         </ItemsControl.Resources>
                     </ItemsControl>
                 </ScrollViewer>

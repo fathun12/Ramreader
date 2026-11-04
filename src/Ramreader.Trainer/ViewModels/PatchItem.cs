@@ -65,7 +65,7 @@ public partial class PatchItem : ObservableObject
         {
             string error = "";
             if (CodePatch.TryParseBytes(patch.OriginalBytes, out var original) &&
-                CodeCave.TryAnalyze(original, out var info, out error))
+                TryAnalyzeAny(original, out var info, out error))
                 _cave = info;
             else
                 _caveError = error.Length > 0 ? error : "Byte patch di profil rusak.";
@@ -77,8 +77,103 @@ public partial class PatchItem : ObservableObject
 
     private bool IsTeam => string.Equals(_patch.Mode, "Team", StringComparison.OrdinalIgnoreCase);
     private bool IsTree => string.Equals(_patch.Mode, "Tree", StringComparison.OrdinalIgnoreCase);
+    private bool IsTreeOwner => string.Equals(_patch.Mode, "TreeOwner", StringComparison.OrdinalIgnoreCase);
 
-    public string Detail => IsTree
+    private bool TryAnalyzeAny(byte[] original, out CaveInfo? info, out string error)
+    {
+        if (!IsTreeOwner) return CodeCave.TryAnalyze(original, out info, out error);
+
+        info = null;
+        error = "";
+        if (original.Length != 5 || original[0] != 0xE8)
+        {
+            error = "Mode TreeOwner butuh satu instruksi call rel32 (5 byte, diawali E8).";
+            return false;
+        }
+        info = new CaveInfo(1, _patch.BaseDisp, 5, 5);
+        return true;
+    }
+
+    /// <summary>Mode "TreeOwner": penunjuk pemilik efek ([simpul+OwnerOffset]) tiap karakter di sisi pemain; slot kosong = nilai mustahil.</summary>
+    private ulong[]? ComputeOwnerSlots(ProcessMemory memory)
+    {
+        var playerBase = ComputeSlot(memory);
+        if (playerBase is null || playerBase.Value < SideTree.BaseFromNode) return null;
+
+        var nodes = SideTree.Collect(memory, playerBase.Value - SideTree.BaseFromNode, SideTree.MaxNodes);
+        if (nodes is null) return null;
+
+        var slots = new ulong[SideTree.MaxNodes];
+        Array.Fill(slots, ulong.MaxValue);
+        int count = Math.Min(nodes.Count, slots.Length);
+        for (int i = 0; i < count; i++)
+        {
+            var b = memory.Read(nodes[i] + (ulong)_patch.OwnerOffset, 8);
+            if (b is null) continue;
+            ulong v = BitConverter.ToUInt64(b, 0);
+            if (v > 0x10000) slots[i] = v;
+        }
+        return slots;
+    }
+
+    private string PrepareOwnerCave(ProcessMemory memory, MemoryWriter writer, ulong site, byte[] original, out byte[] jump)
+    {
+        jump = Array.Empty<byte>();
+        if (original.Length != 5 || original[0] != 0xE8) return "Byte patch di profil bukan call rel32 (E8 + 4 byte).";
+
+        var owners = ComputeOwnerSlots(memory);
+        if (owners is null)
+            return "Pohon sisi milik pemain belum terbaca (objek pemain belum siap). Masuk ke match, gerakkan karakter, lalu nyalakan lagi.";
+
+        ulong cave;
+        lock (_lock) cave = _caveAddr;
+        if (cave == 0)
+        {
+            var allocated = writer.AllocNear(site, 0x1000);
+            if (allocated is null) return "Gagal menyediakan memori dekat kode game untuk patch.";
+            cave = allocated.Value;
+        }
+
+        long callRel = BitConverter.ToInt32(original, 1);
+        ulong target = unchecked((ulong)((long)site + 5 + callRel));
+        byte[] code = CodeCave.BuildCallOwner(target, owners.Length, cave, site, out int slotsOffset, out int dataOffset);
+        for (int i = 0; i < owners.Length; i++)
+            BitConverter.GetBytes(owners[i]).CopyTo(code, slotsOffset + i * 8);
+        if (!writer.Write(cave, code)) return "Gagal menulis kode patch ke memori game.";
+
+        long rel = (long)cave - (long)(site + 5);
+        if (rel > int.MaxValue || rel < int.MinValue) return "Memori patch terlalu jauh dari kode game.";
+        jump = new byte[5];
+        jump[0] = 0xE9;
+        BitConverter.GetBytes((int)rel).CopyTo(jump, 1);
+
+        lock (_lock)
+        {
+            _caveAddr = cave;
+            _slotOffset = slotsOffset;
+            _dataOffset = dataOffset;
+            _lastTree = owners;
+        }
+        return "";
+    }
+
+    private string DiagnosticOwner(ProcessMemory memory)
+    {
+        ulong cave;
+        int data;
+        lock (_lock) { cave = _caveAddr; data = _dataOffset; }
+        if (cave == 0 || data == 0) return "";
+
+        var b = memory.Read(cave + (ulong)data, 24);
+        if (b is null) return " | Diagnostik: belum terbaca";
+
+        return $" | Diagnostik: dipaksa lewati {BitConverter.ToUInt32(b, 0)}x (pemilik sisimu), dibiarkan {BitConverter.ToUInt32(b, 4)}x (bukan sisimu). " +
+               $"Pemilik terakhir dipaksa 0x{BitConverter.ToUInt64(b, 8):X}, terakhir dibiarkan 0x{BitConverter.ToUInt64(b, 16):X}.";
+    }
+
+    public string Detail => IsTreeOwner
+        ? "Timer efek (mis. Awakening) milik sisimu tidak berkurang; efek musuh tetap habis. Mengganti pemanggilan fungsi di game (5 byte)."
+        : IsTree
         ? $"Seluruh sisimu kebal (dikenali dari pohon penghubung karakter di memori, aman untuk karakter kembar); musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
         : IsTeam
         ? $"Seluruh timmu kebal (dikenali dari penanda di objek); musuh tetap bisa dikalahkan. Mengganti instruksi penulis ({_patch.OriginalBytes})."
@@ -171,6 +266,23 @@ public partial class PatchItem : ObservableObject
                 BitConverter.GetBytes(tree[i]).CopyTo(buf, i * 8);
             if (writer.Write(cave + (ulong)slotOffset, buf))
                 lock (_lock) _lastTree = tree;
+            return;
+        }
+
+        if (IsTreeOwner)
+        {
+            var owners = ComputeOwnerSlots(memory);
+            if (owners is null) return;
+
+            ulong[]? prevOwners;
+            lock (_lock) prevOwners = _lastTree;
+            if (prevOwners is not null && prevOwners.AsSpan().SequenceEqual(owners)) return;
+
+            var ownerBuf = new byte[owners.Length * 8];
+            for (int i = 0; i < owners.Length; i++)
+                BitConverter.GetBytes(owners[i]).CopyTo(ownerBuf, i * 8);
+            if (writer.Write(cave + (ulong)slotOffset, ownerBuf))
+                lock (_lock) _lastTree = owners;
             return;
         }
 
@@ -306,7 +418,9 @@ public partial class PatchItem : ObservableObject
                 break;
             case PatchState.Patched:
                 _active = true;
-                StatusText = IsTree
+                StatusText = IsTreeOwner
+                    ? "Patch aktif (mode pemilik efek): timer efek sisimu tidak berkurang, musuh tetap." + DiagnosticOwner(memory)
+                    : IsTree
                     ? "Patch aktif (mode pohon): seluruh sisimu tidak berkurang, musuh tetap." + Diagnostic(memory)
                     : IsTeam
                     ? "Patch aktif (mode tim): seluruh timmu tidak berkurang, musuh tetap. Penanda pemain: " +
@@ -492,6 +606,7 @@ public partial class PatchItem : ObservableObject
     private string PrepareCave(ProcessMemory memory, MemoryWriter writer, ulong site, byte[] original, out byte[] jump)
     {
         jump = Array.Empty<byte>();
+        if (IsTreeOwner) return PrepareOwnerCave(memory, writer, site, original, out jump);
 
         var info = _cave;
         if (info is null)
