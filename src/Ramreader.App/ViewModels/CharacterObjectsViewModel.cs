@@ -293,8 +293,6 @@ public partial class CharacterObjectsViewModel : ObservableObject
     [RelayCommand]
     private void AutoMark()
     {
-        const int markerOffset = 0x44;
-
         var memory = Session.Memory;
         if (memory is null) return;
 

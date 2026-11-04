@@ -19,7 +19,6 @@ public partial class InstantAwakeningItem : ObservableObject
 
     private readonly ObservableCollection<FeatureItem> _features;
     private readonly ObservableCollection<PatchItem> _patches;
-    private bool _syncing;
     private bool _applyingSettings;
 
     public InstantAwakeningItem(ObservableCollection<FeatureItem> features, ObservableCollection<PatchItem> patches)
@@ -74,7 +73,6 @@ public partial class InstantAwakeningItem : ObservableObject
 
     partial void OnIsOnChanged(bool value)
     {
-        if (_syncing) return;
         StatusText = value ? Start() : Stop();
     }
 
