@@ -5,7 +5,7 @@
 
 ## 0. Prompt pembuka untuk sesi baru
 
-**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku. Lanjutan 2g ada di 2h (hasil bongkar kode). HASIL AKHIR: lihat 2j (durasi Awakening berhasil lewat kartu 6.1).**
+**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku. Lanjutan 2g ada di 2h (hasil bongkar kode). HASIL AKHIR: lihat 2o (durasi Awakening berhasil lewat patch "(sisi)"; klaim kartu 6.1 di 2j sudah tidak berlaku). Awakening Instan (HP 40 terkunci + durasi tanpa batas) berhasil: lihat 2p.**
 
 Tempel ini bersama isi dokumen ini:
 
@@ -301,6 +301,32 @@ Tidak diketahui. Apakah musuh atau efek lain juga berkategori 1 (kalau ya, mode 
 
 Langkah berikut. Menunggu potongan JSON kartu "durasi awekening 6.1" dari user (aturan 29), lalu menyisipkan patch ke kartu itu lewat penggantian teks dengan cadangan.
 
+## 2n. Pemilik entri timer Awakening dan jalan buntu Nop (4 Nov 2026, PID 31184). Menggantikan klaim 2j bahwa kunci kartu 6.1 andal
+
+Fakta (laporan user). Kartu "durasi awekening 6.1" tidak terbaca Penulis Kode (0 instruksi) dan tidak bisa dikontrol di Awakening kedua; jalurnya tidak lagi menunjuk entri hidup. Patch "Awakening Durasi Tanpa Batas (kode)" bermode Nop membuat musuh ikut terkena (aturan 20): jangan dipakai. Pembeda sisi harus dicari lewat pemilik entri.
+
+Fakta (perintah baca-saja, 4 Nov 2026). Entri berbentuk (187, 900, -1.0f) hanya 1; pemilik [entri+18h] = 0x23323F00510, vtable +190A5A0, penanda +3C = 00000000 00000030 00000000 (bukan penanda karakter). Karakter pemain (awal 0x233012075C0 = alamat HP kartu HP dikurangi 0x38): karakter+0x30 dan karakter+0x878 menunjuk ke awal pemilik; tidak ada penunjuk balik pemilik ke karakter (0x800 byte pertama). Satu karakter saja yang dicek.
+
+Rancangan (BELUM dibangun, belum dites). Pasang di call +97B965 (call 9CFE80), bukan +97B96A (+97B96E adalah tujuan lompatan). Cave: panggil 9CFE80; kalau eax 0 dan [rdi+18h] ada di daftar pemilik sisi pemain, eax = 1 (game melewati pengurangan). Daftar pemilik diisi Trainer dari simpul pohon sisi ([simpul+0x30]). Patch harus tinggal di kartu HP. Tidak diketahui: apakah teman satu tim punya penunjuk di +0x30; apakah efek kategori 1 milik sisi pemain yang lain ikut membeku; fungsi persis 9CFE80.
+
+## 2o. Durasi Awakening BERHASIL lewat patch "(sisi)" (4 Nov 2026, PID 31184). BACA INI DULU; menggantikan klaim 2j (kunci kartu 6.1)
+
+Fakta (laporan user dari layarnya). Patch "Awakening Durasi Tanpa Batas (sisi)" di kartu HP, Mode "TreeOwner": Awakening bertahan lebih dari 24 detik (user menunggu sampai 1 menit), dites lebih dari 3 kali dengan toggle dinyalakan dan dimatikan; sisi musuh tidak terpengaruh. Kartu "durasi awekening 6.1" tidak terbaca Penulis Kode dan tidak bisa dikontrol di Awakening kedua, jadi klaim 2j tidak berlaku. Patch lama "Awakening Durasi Tanpa Batas (kode)" (Mode Nop, +97B96C 75 50 jadi EB 50) membuat musuh ikut terkena (terbukti, aturan 20): jangan dinyalakan.
+
+Fakta (disassembler dan perintah baca-saja). Fungsi +97B93D..+97B97F mengurangi timer satu entri (rdi = entri). Hook di call 9CFE80 di +97B965 (byte E8 16 45 05 00). Entri timer berbentuk (187, 900, -1.0f); pemilik [entri+18h] punya vtable di modul game; penunjuk karakter ke pemilik: karakter+0x30 dan karakter+0x878 (karakter = awal simpul = alamat HP dikurangi 0x38). Tidak ada penunjuk balik dari pemilik.
+
+Kode (build lolos, terbukti jalan lewat laporan user). CodePatch.BaseDisp (16) dan OwnerOffset (48); CodeCave.BuildCallOwner (hook call: panggil 9CFE80 asli; kalau eax 0 dan [rdi+18h] ada di slot pemilik sisi pemain, eax = 1 sehingga game melewati pengurangan; blok diagnostik 24 byte); PatchItem Mode "TreeOwner" (TryAnalyzeAny, ComputeOwnerSlots dari SideTree.Collect, PrepareOwnerCave, DiagnosticOwner). Patch tersimpan di kartu HP (label "Awakening Durasi Tanpa Batas (sisi)", Mode TreeOwner, Pattern 44 8D 42 FB ?? ?? ?? ?? ?? 85 C0 75 ?? 8B 4F 10 ..., InstructionOffset 4, OriginalBytes E8 16 45 05 00). Disisipkan ke JSON sesi lewat penggantian teks (1 penggantian, cadangan .bak).
+
+Syarat Awakening (kata user, 4 Nov 2026): darah 40, pemicu kombinasi, ada nilai float, baru Awakening. Pemicunya belum ditemukan (pencarian user gagal). Rencana (BELUM dibangun, menunggu berkas Trainer): tombol "Awakening Instan" = matikan God Mode, set HP 40 lalu Freeze, nyalakan patch durasi "(sisi)". Tidak diketahui: apakah syaratnya persis 40 atau di bawah 40, dan apakah skala HP 0 sampai 100 (kartu HP terbaca 37,8421). Risiko diketahui: Freeze tidak mencegah turun, hanya mengembalikan (11.8).
+
+Belum diketahui. Apakah timer bertahan setelah tag ke karakter lain, rematch, dan restart game (user belum merinci); angka diagnostik kartu; apakah efek kategori 1 sisi pemain yang lain ikut membeku; fungsi persis 9CFE80. Profil user (kartu dan patch) tidak boleh masuk rilis (aturan 28). Kartu durasi lama dan patch (kode) masih ada di profil; menghapusnya keputusan user (aturan 26). Kode TreeOwner mungkin belum di-commit: cek git status.
+## 2p. Awakening Instan BERHASIL (4 Nov 2026). BACA INI DULU; menggantikan baris 9F di tabel (penentu durasi sudah ditemukan, lihat 2o) dan rencana "belum dibangun" di 2o
+
+Fakta (laporan user dari layarnya: "aman, Awakening Instan berhasil"). Kartu baru "Awakening Instan" di Trainer: satu toggle dan hotkey. Saat dinyalakan: God Mode dimatikan bila menyala, HP diset 40 lalu dikunci (Freeze), patch "Awakening Durasi Tanpa Batas (sisi)" dinyalakan. Pemicu Awakening di game (kombinasi tombol) tetap ditekan user sendiri; pemicunya belum pernah ditemukan lewat pencarian. Saat dimatikan: kunci HP dilepas dan patch durasi mati; God Mode TIDAK dinyalakan otomatis (user tidak memintanya).
+
+Kode (build lolos, terbukti jalan lewat laporan user). ViewModels\InstantAwakeningItem.cs (baru; CanBuild butuh kartu berlabel "HP" dan patch berlabel "Awakening Durasi Tanpa Batas (sisi)"; Refresh tiap detik melepas semuanya bila kunci HP atau patch durasi mati/gagal), MainViewModel (field _instant, hotkey lewat RegisterOne, simpan hotkey di settings.Patches["Awakening Instan"], kartu ditambahkan setelah patch, Refresh di OnTick), MainWindow.xaml (DataTemplate InstantAwakeningItem). Hotkey kosong secara bawaan; isi sendiri di kolom Hotkey kartu (F2 sampai F9 sudah terpakai).
+
+Belum diketahui. Apakah syarat Awakening persis HP 40 atau di bawah 40 (kartu HP terbaca 37,8421 saat dicek; skala belum dipastikan); rincian kondisi tes (rematch, ganti karakter lewat tag, restart game) belum dilaporkan user; apakah hotkey kartu sudah dites; risiko diketahui: kunci HP tidak mencegah HP turun, hanya mengembalikan (11.8), dan God Mode mati selama kartu menyala. Profil user tidak boleh masuk rilis (aturan 28). Kode TreeOwner dan Awakening Instan mungkin belum di-commit: cek git status.
 ## 3. Lingkungan user
 
 - Windows 11, VS Code, terminal **PowerShell 5.1**, root `D:\Projects\Ramreader`.
