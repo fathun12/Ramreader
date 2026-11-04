@@ -5,7 +5,7 @@
 
 ## 0. Prompt pembuka untuk sesi baru
 
-**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku. Lanjutan 2g ada di 2h (hasil bongkar kode).**
+**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku. Lanjutan 2g ada di 2h (hasil bongkar kode). HASIL AKHIR: lihat 2j (durasi Awakening berhasil lewat kartu 6.1).**
 
 Tempel ini bersama isi dokumen ini:
 
@@ -282,6 +282,14 @@ Dugaan (belum terbukti). +97B97F adalah penurun timer asli: offset +10h cocok de
 Tidak diketahui. Apakah +97B97F juga dipakai musuh atau efek lain; dari mana ecx; apakah patch di sana memperpanjang Awakening tanpa efek samping.
 
 Langkah berikut. Halaman Lihat Kode (fitur baru di Ramreader.App, file CodeViewViewModel.cs, CodeViewPage.xaml dan .xaml.cs) membongkar instruksi di sekitar +97B97F. Jangan Nop (aturan 20) sebelum dicek; buat patch bersyarat kalau dipakai musuh. Hasilnya belum dilaporkan user.
+
+## 2j. Durasi Awakening BERHASIL lewat kartu 6.1 (4 Nov 2026). BACA INI DULU; menggantikan baris 9F dan kalimat "penentu belum ditemukan" di 2g, 2h, dan tabel
+
+Fakta (tangkapan layar dan laporan user). User mengunci nilai kartu "durasi awekening 6.1" di Trainer (jalur NSUNSC.exe+21CA0D0 -> +58 -> +758 -> +3E0, int, dikunci 900). Awakening berlangsung sampai 1 menit 50 detik pada stopwatch (tangkapan layar: Naruto mode Kyuubi, stopwatch 1:50.30 masih berjalan), padahal normalnya 15 detik. Kartu 6.1 ditulis oleh mov [rdi+10h],ecx di NSUNSC.exe+97B97F (69 hit, 69 berubah, 69 turun). Kartu 6.0 (+21BE600 -> +720) adalah salinan HUD. Kartu lama durasi 2, 3, 3.1, 4, dan 5 bukan timer asli.
+
+Keputusan user. Cukup mengunci nilai kartu 6.1; patch kode di +97B97F tidak dibuat dan Lihat Kode (2i) tidak diperlukan ("ngga perlu", kata user).
+
+Belum diverifikasi (aturan 25, minimal 3 kondisi). Berhasil satu kali. Tidak diketahui: apakah jalur 6.1 tetap benar di Awakening berikutnya, setelah rematch, dan setelah ganti karakter; apakah mengunci nilai berefek pada musuh atau karakter lain; apa yang terjadi saat Awakening berakhir sementara nilai masih terkunci. Jangan mencatat "terbukti" sebelum user melaporkan tiga kondisi itu dari layarnya. Profil user (kartu) tidak boleh masuk rilis (aturan 28).
 
 ## 3. Lingkungan user
 
