@@ -327,6 +327,58 @@ Fakta (laporan user dari layarnya: "aman, Awakening Instan berhasil"). Kartu bar
 Kode (build lolos, terbukti jalan lewat laporan user). ViewModels\InstantAwakeningItem.cs (baru; CanBuild butuh kartu berlabel "HP" dan patch berlabel "Awakening Durasi Tanpa Batas (sisi)"; Refresh tiap detik melepas semuanya bila kunci HP atau patch durasi mati/gagal), MainViewModel (field _instant, hotkey lewat RegisterOne, simpan hotkey di settings.Patches["Awakening Instan"], kartu ditambahkan setelah patch, Refresh di OnTick), MainWindow.xaml (DataTemplate InstantAwakeningItem). Hotkey kosong secara bawaan; isi sendiri di kolom Hotkey kartu (F2 sampai F9 sudah terpakai).
 
 Belum diketahui. Apakah syarat Awakening persis HP 40 atau di bawah 40 (kartu HP terbaca 37,8421 saat dicek; skala belum dipastikan); rincian kondisi tes (rematch, ganti karakter lewat tag, restart game) belum dilaporkan user; apakah hotkey kartu sudah dites; risiko diketahui: kunci HP tidak mencegah HP turun, hanya mengembalikan (11.8), dan God Mode mati selama kartu menyala. Profil user tidak boleh masuk rilis (aturan 28). Kode TreeOwner dan Awakening Instan mungkin belum di-commit: cek git status.
+
+## 2q. Serah terima 4 Nov 2026: Awakening tanpa batas dan Awakening Instan, untuk trainer standalone (BACA SETELAH 2p)
+
+Hanya mencatat pekerjaan satu sesi (aturan 33). Label: FAKTA = dari layar user atau disassembler; DUGAAN = belum terbukti; TIDAK TAHU = jangan dianggap benar.
+
+### Tugas sesi berikutnya
+Memperbaiki trainer STANDALONE milik user. Ini proyek terpisah dari Ramreader dan Ramreader.Trainer: TIDAK memakai JSON profil; kode dan alamatnya langsung ada di dalam proyek (kata user: "di root langsung"). AI sesi ini BELUM PERNAH melihat berkas trainer itu. Jangan berasumsi bentuknya sama dengan Ramreader.Trainer. Minta dulu berkasnya lewat satu perintah Set-Clipboard (aturan 14, 29), jelaskan alasannya. Desain dulu, bangun kalau diminta (aturan 1).
+
+### A. Awakening tanpa batas (hanya sisi pemain), TERBUKTI
+FAKTA (user): Awakening bertahan lebih dari 24 detik (user menunggu sampai 1 menit), dites lebih dari 3 kali dengan toggle dinyalakan dan dimatikan; Awakening musuh tidak terpengaruh. Normalnya 15 detik.
+
+Semua alamat = NSUNSC.exe + RVA. MainModuleSize 166223872 (versi game yang dites).
+
+Struktur entri timer (FAKTA dari scan memori dan getter): bentuk entri = [+8]=187 (id), [+0Ch]=900 (maksimum, 60 fps x 15 detik), [+10h]=timer sekarang (turun 60 per detik), [+14h]=-1.0f, [+18h]=penunjuk PEMILIK efek (vtable pemilik +190A5A0). Entri ditemukan dengan memindai memori game untuk bentuk itu; alamatnya berubah tiap Awakening.
+
+Fungsi pengurang timer (FAKTA, bongkaran): +97B93D..+97B9BE. rdi = entri. Urutan: ecx=[rdi+8] id; rec=call +988AE0(id); kalau rec ada dan [rec+0Ch]==1 maka di +97B965 `call +9CFE80` (rcx=[rdi+18h] pemilik, edx=6, r8d=1); di +97B96A `test eax,eax`, +97B96C `jne +97B9BE` = LEWATI pengurangan bila eax tidak nol. Selain itu: ecx=[rdi+10h]; kalau negatif (-1) lewati; ecx -= cvttss2si([+21D0884]) (besar pengurangan global); tulis [rdi+10h]=ecx di +97B97F; kalau ecx<=0 maka [rdi+10h]=ebp dan call +97C120 (penutup efek).
+
+Patch yang BERHASIL (hook call): di +97B965, instruksi `call +9CFE80`, byte E8 16 45 05 00, diganti `jmp` (E9 rel32) ke cave 0x1000 byte dekat kode game (alokasi dekat situs). Cave (CodeCave.BuildCallOwner): call target asli; `test eax,eax`; kalau tidak nol selesai; kalau nol maka rax=[rdi+18h] dibandingkan dengan maksimal 12 slot (8 byte); kalau sama dengan salah satu slot maka eax=1 (game lalu melewati pengurangan lewat jalurnya sendiri); jmp balik ke +97B96A. Blok diagnostik 24 byte (dipaksa / dibiarkan / pemilik terakhir). Cave tidak menyentuh register selain rax.
+Pola pencari lokasi (AOB, dimulai di +97B961): `44 8D 42 FB ?? ?? ?? ?? ?? 85 C0 75 ?? 8B 4F 10 85 C9 78 49 F3 0F 2C 05 ?? ?? ?? ?? 2B C8 89 4F 10 85 C9 7F 38 48 8B CF 89 6F 10 E8 ?? ?? ?? ??`, InstructionOffset 4, OriginalBytes `E8 16 45 05 00`.
+
+Slot pemilik diisi thread latar Trainer tiap 10 ms: node pemain = alamat HP - 0x38 (HP = [rcx+10h], rcx = node+0x28). SideTree.Collect menelusuri tiga penunjuk di node+0x00/+0x08/+0x10 (hanya sambungan timbal balik, maksimal 12 node, pohon sisi; aman untuk karakter kembar/mirror). Untuk tiap node: pemilik = [node+0x30] (OwnerOffset 48); disimpan kalau > 0x10000. Nilai slot kosong = 0xFFFFFFFFFFFFFFFF.
+FAKTA: untuk karakter pemain, [node+0x30] DAN [node+0x878] sama-sama menunjuk awal pemilik; tidak ada penunjuk balik pemilik ke karakter (0x800 byte pertama).
+Mengapa bukan +97B96A: +97B96E adalah tujuan lompatan (dari +97B950 dan +97B956); lompatan 5 byte di +97B96A akan menimpanya.
+
+JALAN BUNTU (FAKTA, jangan diulang):
+- Patch NOP/EB di +97B96C (75 50 menjadi EB 50, Mode Nop): Awakening MUSUH ikut tidak habis (user: faktanya begitu).
+- Mengunci nilai kartu 6.1 (jalur +21CA0D0 -> +58 -> +758 -> +3E0): berhasil sekali, lalu jalurnya mati; Penulis Kode 0 instruksi. Entri dibuat ulang tiap Awakening; jalur itu hanya menunjuk cache.
+- NOP +73B8D0 (mov [rdi+rbx+1C0h],esi): hanya salinan HUD, Awakening tetap habis. Kartu 6.0 (+21BE600 -> +720) juga salinan HUD.
+TIDAK TAHU: apakah teman satu tim juga punya penunjuk pemilik di +0x30 (hanya karakter pemain yang dicek); apakah efek kategori 1 sisi pemain lain ikut membeku; fungsi persis +9CFE80; apakah Awakening bisa berakhir lewat jalur lain (mis. chakra habis); apakah tetap benar setelah tag ke karakter lain, rematch, dan restart game (user belum merinci; aturan 25).
+
+### B. Awakening Instan, TERBUKTI ("aman, berhasil")
+Bukan patch game; orkestrasi di Trainer. Satu toggle/hotkey: (1) matikan God Mode kalau menyala; (2) set HP = 40 lalu Freeze (kunci); (3) nyalakan patch durasi (bagian A). Mematikan: lepas kunci HP dan matikan patch durasi; God Mode TIDAK dinyalakan lagi otomatis (user tidak memintanya). Tiap detik, kalau toggle menyala tetapi kunci HP atau patch durasi sudah mati/gagal, semuanya dilepas otomatis.
+Syarat Awakening di game (kata user): HP 40, pemicu kombinasi tombol, ada nilai float, baru Awakening. Pemicunya belum pernah ditemukan (user sudah mencari, gagal). Karena itu Awakening tetap ditekan user sendiri.
+HP: float, dibaca 37,8421 di salah satu sesi; jalur kartu HP `NSUNSC.exe|21D74B8|250,0,38` (format: cur=ReadPtr(modul+RVA); tiap offset ditambah, dereferensi kecuali offset terakhir; ada 11 jalur cadangan dan satu signature `24 10 57 48 83 EC 20 48 8B 3D ?? ?? ?? ?? 33 F6 48 8B`, DispOffset 10, InstructionEnd 14, Offsets 250,0,38).
+TIDAK TAHU: apakah syaratnya persis 40 atau di bawah 40 (kalau gagal di 40, ubah angkanya); skala HP 0 sampai 100 (belum dipastikan). RISIKO (FAKTA, SPEC 11.8): Freeze tidak mencegah HP turun, hanya mengembalikan; dengan God Mode mati, serangan yang membunuh dalam satu frame bisa lolos.
+
+### C. Patch NSUNSC lain yang terbukti, untuk trainer standalone
+Mode "Tree" = cave yang melewati penulisan bila register basis (rcx atau rax) sama dengan salah satu dari 12 slot node sisi pemain; penulisan musuh tetap jalan. JANGAN pakai NOP polos pada instruksi yang dipakai musuh (aturan 20; terbukti HP dan summon).
+- God Mode: +94BAE2 `movss [rcx+10h],xmm0` (F3 0F 11 41 10), pola `?? ?? ?? ?? ?? 76 ?? C7 41 10 00 00 00`, Tree.
+- Unlimited Chakra: +94BA22 `movss [rcx+18h],xmm0` (F3 0F 11 41 18), pola `?? ?? ?? ?? ?? 76 ?? C7 41 18 00 00 00`, Tree. JANGAN sentuh +94BC94 dan +94BC9B (pengisian).
+- Team Tag (cooldown summon): +94BB7A `movss [rax+2Ch],xmm0` (F3 0F 11 40 2C), pola `?? ?? ?? ?? ?? 76 ?? C7 40 2C 00 00 00`, Tree (rax-0x28 = node). Jangan sentuh +94BDEF (pengisi) dan +94BDF6 (batas 100).
+- Tag Switch (tag tanpa cooldown): +94C3B6 `movss [rax+2Ch],xmm6` (F3 0F 11 70 2C), InstructionOffset 8, Tree.
+- Unlimited Kawarimi: +94C09E `movss [rcx+20h],xmm2` (kemungkinan F3 0F 11 51 20, disimpulkan dari baris adc/movups, belum dibaca dari JSON), Tree. Bar harus 100 dulu saat dinyalakan (dugaan).
+- Unlimited Team Bar: tanpa patch kode; Kunci 100 otomatis. Gold Ticket: nilai Int32.
+Pola lengkap dan byte asli tiap patch ada di NSUNSC.json milik user (%AppData%\Ramreader\sessions\); sebagian pola terpotong saat dicetak. Minta potongan JSON lewat Set-Clipboard sebelum menyalin ke standalone (aturan 29). Hotkey di Ramreader.Trainer: God Mode F2, Chakra F3, Team Tag F4, Tag Switch F7, Team Bar F8, Kawarimi F9 (F5/F6 sisa Cooldown yang sudah dihapus); Awakening Instan hotkey kosong.
+
+### D. Status pekerjaan (belum dikonfirmasi user)
+- SPEC 2o dan 2p sudah masuk (dilaporkan user, 117841 karakter).
+- Perintah commit (3 commit: Lihat Kode; TreeOwner dan Awakening Instan; SPEC) dan perintah build rilis v0.1.2 sudah diberikan; hasilnya BELUM dilaporkan. Cek git status dan hasil build (jumlah berkas Profil/Pengaturan/NSUNSC di zip harus 0, aturan 28). Deskripsi rilis Indonesia/Inggris belum ditulis. Push adalah keputusan user.
+- Kode game-spesifik (kartu Awakening Instan memakai label "HP" dan "Awakening Durasi Tanpa Batas (sisi)") kini ada di Ramreader.Trainer yang generik; perlu dipikirkan saat membuat trainer NARUTO (keputusan user).
+- SPEC bagian 2k dan 2m tidak ada di salinan yang dipegang sesi ini.
+
 ## 3. Lingkungan user
 
 - Windows 11, VS Code, terminal **PowerShell 5.1**, root `D:\Projects\Ramreader`.
@@ -353,7 +405,6 @@ D:\Projects\Ramreader\
   .gitignore
   README.md
   LICENSE
-  Directory.Build.props         nama produk, penulis, versi untuk semua proyek
   SPEC.md
   src\
     Ramreader.Core\                 (classlib, net10.0)
