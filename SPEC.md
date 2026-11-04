@@ -5,6 +5,8 @@
 
 ## 0. Prompt pembuka untuk sesi baru
 
+**BACA DULU (4 Nov 2026): bagian 2g (pekerjaan terakhir: durasi Awakening yang belum selesai) dan aturan 34. Bagian 2f dan 2g hanya mencatat sesi masing-masing; bagian lain tetap berlaku.**
+
 Tempel ini bersama isi dokumen ini:
 
 "Ini spec proyek Ramreader. Baca semua, terutama bagian 2 (cara kerja denganku; aturan 26 sampai 33 lahir dari kesalahan sesi AI sebelumnya), bagian 2f (serah terima terakhir) dan bagian 9 (status). Lanjutkan dari langkah pertama yang belum selesai di tabel bagian 9. Jangan membangun apa pun sebelum aku minta. Ulangi dulu aturan kerja versimu supaya aku tahu kamu paham."
@@ -92,6 +94,8 @@ User berbahasa Indonesia, santai. Kalau ia menulis huruf kapital semua, itu tand
 32. **Ikon dan desain: jangan membuat "AI slop".** User menolak ikon buatan AI (chip RAM dengan huruf R atau T, latar gelap bergradien, aksen biru muda atau oranye) pada 3 Nov 2026 karena generik. Jangan membuat ulang ikon sebelum user menjelaskan gayanya (satu pertanyaan: warna, bentuk, atau gambar contoh). Hindari klise: persegi gelap membulat, gradien, huruf di dalam ikon, chip stok. Pemasangan ikon: satu baris ApplicationIcon di .csproj (belum pernah dipasang; kedua .csproj sudah dibaca).
 
 33. **Kamu bukan satu-satunya sesi AI di proyek ini.** Perbarui hanya bagian SPEC yang kamu kerjakan. Jangan mengubah, menyatakan salah, atau menyatakan "belum dikerjakan" bagian yang bukan kerjamu: sesi lain atau user sendiri mungkin sudah mengerjakannya. Kalau menemukan teks lama yang berbahaya (contoh: 2e menyuruh menghapus kartu KAWARIMI 2), jangan menulis ulang barisnya; tulis koreksi di bagian milikmu dan sebut bagian mana yang digantikan. Sebelum mengedit SPEC, minta salinan terbaru dari user: SPEC milik user bisa sudah berbeda dari salinan yang AI pegang (3 Nov 2026 baris 2e nomor 2 sudah berbeda).
+
+34. **Kalau tidak tahu fungsi sesuatu, bilang tidak tahu dan tanya; jangan menyuruh user mengetes hal yang fungsinya tidak AI ketahui.** 4 Nov 2026: AI menyuruh user menyalakan patch "Triger Awekening contoh" tanpa tahu fungsinya; user kesal. Pisahkan selalu: fakta (dari layar atau stopwatch user, atau hasil disassembler), dugaan (beri label), dan yang tidak diketahui (tulis "tidak tahu"). Jangan menyajikan tebakan sebagai langkah.
 
 ## 2b. Catatan serah terima 2 Nov 2026 (Langkah 9E, baca ini dulu)
 
@@ -230,6 +234,30 @@ Arah teknis (dugaan, bukan keputusan; desain dulu, aturan 1): profil dan pengatu
 2. Ikon: tanya gayanya dulu (aturan 32).
 3. Trainer NARUTO standalone: desain dulu; minta berkas lewat Set-Clipboard (PatchItem, FeatureItem, MainWindow.xaml, TrainerSession).
 4. Push commit: keputusan user, jangan disuruh.
+
+## 2g. Catatan serah terima 4 Nov 2026 (durasi Awakening, BELUM SELESAI). BACA INI SETELAH 2f
+
+Hanya mencatat pekerjaan satu sesi AI. Penentu durasi Awakening BELUM ditemukan.
+
+**Tujuan user.** Awakening tanpa batas waktu (durasinya selalu kurang). Game: NSUNSC. Istilah resmi (halaman Bandai Namco Eropa en.bandainamcoent.eu/node/8857): Storm gauge = gauge terkecil di bawah gauge chakra, terisi saat memukul atau terkena serangan; kalau penuh bisa dipakai untuk teknik rahasia, combination secret technique, atau Awakening; Awakening menghabiskan seluruh chakra. Halaman itu TIDAK menjelaskan bagaimana durasi ditampilkan. Pertanyaan yang belum dijawab user: bar mana di HUD yang menyusut selama Awakening.
+
+**Fakta (dilaporkan user dari layar atau stopwatch).**
+- Nilai awal durasi 900 = 15 detik (stopwatch user), turun 60 per detik. Dugaan: hitungan frame di 60 fps.
+- Cari Nilai (tipe Bilangan bulat 8 byte, mode Nilai berkurang) menyisakan 2 alamat: 0x22FCDDE0088 (548 ke 488) dan 0x22FDB587710 (338 ke 278), keduanya turun 60 per Scan Lanjutan (alamat mentah sesi PID 27028; jangan disimpan). User menyimpan kartu "durasi awekening 3 tanpa verifikasi" dan "durasi awekening 4" di Tersimpan (jalur belum diverifikasi).
+- Penulis Kode pada kartu itu menangkap satu instruksi: mov [rdi+rbx+1C0h],esi (89 B4 1F C0 01 00 00, 7 byte) di NSUNSC.exe+73B8D0. Sesi 1: Hit 901, Berubah 901, Turun 900. Sesi 2: Hit 157, Berubah 157, Turun 157.
+- Patch buatan user di Trainer: (a) "Awakening Tanpa Batas" = NOP di +73B8D0, mode kosong. Dilaporkan: animasi gauge berhenti, tetapi Awakening tetap habis beberapa detik kemudian. Jadi instruksi ini hanya menulis salinan tampilan atau hitungan turunan dan BUKAN penentu berakhirnya Awakening. Jangan dipatch lagi. (b) "Triger Awekening contoh" = byte F3 0F 11 84 1F BC 01 00 00, terbaca disassembler capstone sebagai movss [rdi+rbx+1BCh],xmm0 (float, empat byte sebelum +1C0 pada struktur yang sama). Kata user: hanya menghitung float yang mengaktifkan Awakening. Dinyalakan sendiri: Awakening tetap habis (dilaporkan user). AI sesi itu TIDAK tahu fungsi persisnya.
+- Pola sama dengan Cooldown tagging (+60/+64): menahan salinan tampilan tidak menahan penentunya.
+
+**Dugaan (belum terbukti).** Nilai esi di +73B8D0 dihitung dari variabel lain (mis. 900 dikurangi waktu berjalan), jadi penghitung asli ada di tempat lain; atau tulisan itu hanya pembaruan HUD. Game kemungkinan membandingkan nilai dengan nol atau 0x384 (900) untuk mengakhiri Awakening.
+
+**Tidak diketahui.** Dari mana esi berasal; fungsi persis "Triger Awekening"; bar HUD mana yang menunjukkan durasi; apakah pause membekukan timer; kenapa dua alamat int64 selisihnya tetap 210; kenapa user menemukan nilai float menurut katanya padahal dua alamat yang ketemu bertipe int64 (user bilang durasinya float; belum dicocokkan).
+
+**Langkah yang disiapkan sesi ini.**
+- Perintah PowerShell (Administrator, NSUNSC berjalan) yang membaca byte kode game: Add-Type P/Invoke OpenProcess dengan akses 0x410 dan ReadProcessMemory, dari basis modul + 0x73B5D0 sepanjang 0x400 byte (0x300 sebelum dan 0x100 sesudah +73B8D0), mencetak hex 32 byte per baris dan menyalin ke clipboard. Byte di +73B8D0 harus 89 B4 1F C0 01 00 00; kalau 90 x7, toggle "Awakening Tanpa Batas" masih menyala (matikan dulu). Hasilnya belum dilaporkan user. Tulis ulang perintahnya kalau perlu.
+- Disassemble: pip install capstone --break-system-packages, lalu Cs(CS_ARCH_X86, CS_MODE_64). Terverifikasi memecahkan dua instruksi di atas. Mulai dari awal fungsi (cari padding CC atau ret sebelum +73B8D0). Cari: dari mana esi dimuat; instruksi yang membandingkan nilai itu dengan nol atau 900; lompatan yang mengakhiri Awakening. Patch dibuat di penentu itu, bukan di penulis HUD. Cek apakah instruksi itu juga dipakai musuh (Mode Tree, bagian 2c).
+- Permintaan user (sudah disuruh): fitur "Lihat Kode" di Ramreader, yang menampilkan beberapa instruksi sebelum dan sesudah sebuah lokasi tanpa Cheat Engine; Core sudah memakai disassembler Iced di WriteTracer. BELUM dibangun karena file Ramreader.App belum dibaca sesi ini. Minta dulu lewat satu perintah Set-Clipboard (aturan 14): src\Ramreader.App\App.xaml.cs, src\Ramreader.App\MainWindow.xaml, Views\CharacterObjectsPage.xaml dan .xaml.cs, ViewModels\CharacterObjectsViewModel.cs, src\Ramreader.Core\Debugging\WriteTracer.cs. Setelah itu bangun sesuai pola halaman Objek Karakter, lalu beri perintah tutup, build, buka (aturan 22).
+
+**Peringatan.** Toggle "Awakening Tanpa Batas" mungkin masih menyala di Trainer user: suruh matikan sebelum menutup Trainer (lompatan ke cave bisa tertinggal di game). Profil user kini berisi dua patch buatan itu dan dua kartu durasi; profil user tidak boleh masuk rilis.
 
 ## 3. Lingkungan user
 
@@ -400,6 +428,7 @@ Tujuan: cari rantai `Game.exe+offset -> [+o1] -> [+o2] ...` menuju alamat target
 | 10 | Rilis mesin (Ramreader dan Trainer, TANPA profil game) di GitHub Releases | v0.1.0 (beta) terbit (screenshot user). Zip v0.1.1 bersih sudah dibangun (413 berkas, 0 profil atau pengaturan, screenshot user), BELUM diunggah. Lihat 2f dan aturan 28 |
 | 11 | Ikon aplikasi (Ramreader, Trainer, dan trainer Naruto) | Belum ada. Ikon buatan AI ditolak user (generik). Tanya gaya dulu, aturan 32. Lihat 2f |
 | 12 | Trainer NARUTO standalone (satu berkas, data NSUNSC tertanam, tanpa Reader) | Belum didesain. Itu tujuan user sejak awal. Lihat 2f |
+| 9F | Durasi Awakening tanpa batas (NSUNSC) | Penentu BELUM ditemukan. +73B8D0 (mov [rdi+rbx+1C0h],esi) hanya menahan animasi gauge, Awakening tetap habis (dilaporkan user). Nilai awal 900 = 15 detik (stopwatch user). Langkah berikut: dump byte kode dan cari asal esi; fitur Lihat Kode belum dibangun. Lihat 2g |
 
 ## 10. Catatan dan risiko
 
