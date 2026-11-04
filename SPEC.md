@@ -273,6 +273,16 @@ Tidak diketahui. Siapa yang menurunkan [entri+10h]; arti ID 187 dan status 0x7C;
 
 Langkah berikut. User menyuruh membangun alat di Ramreader (membaca halaman memori dan entri, plus Lihat Kode). Perintah Set-Clipboard permintaan file sudah diberikan (daftar berkas di 2g). Bangun: (1) Lihat Kode (disassembly Iced di RVA); (2) pemantau tulis untuk alamat tanpa kartu. Setelah itu pantau penulis [entri+10h]; patch dibuat di penulis itu, bukan di +73B8D0. Cek apakah instruksi itu juga dipakai musuh (aturan 20).
 
+## 2i. Lanjutan 2h, 4 Nov 2026 (penulis timer Awakening ketemu). BACA INI SETELAH 2h
+
+Fakta (layar user). Kartu "durasi awekening 6.1" (jalur +21CA0D0 -> +58 -> +758 -> +3E0, nilai 604) ditulis oleh mov [rdi+10h],ecx di NSUNSC.exe+97B97F: 69 hit, 69 berubah, 69 turun, alamat "cocok". Kartu "durasi awekening 6.0" (+21BE600 -> +720) adalah salinan HUD (kata user, sesuai penulis +73B8D0 di 2g/2h).
+
+Dugaan (belum terbukti). +97B97F adalah penurun timer asli: offset +10h cocok dengan [entri+10h] dari getter +A2CC60 (2h). Instruksinya generik (menulis [rdi+10h] untuk entri apa pun), jadi mungkin juga dipakai efek lain atau musuh.
+
+Tidak diketahui. Apakah +97B97F juga dipakai musuh atau efek lain; dari mana ecx; apakah patch di sana memperpanjang Awakening tanpa efek samping.
+
+Langkah berikut. Halaman Lihat Kode (fitur baru di Ramreader.App, file CodeViewViewModel.cs, CodeViewPage.xaml dan .xaml.cs) membongkar instruksi di sekitar +97B97F. Jangan Nop (aturan 20) sebelum dicek; buat patch bersyarat kalau dipakai musuh. Hasilnya belum dilaporkan user.
+
 ## 3. Lingkungan user
 
 - Windows 11, VS Code, terminal **PowerShell 5.1**, root `D:\Projects\Ramreader`.
